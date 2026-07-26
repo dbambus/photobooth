@@ -216,7 +216,11 @@ class CameraGphoto2(CameraInterface):
         return os.path.join(backup_dir, file_name)
 
     def _getJpeg(self, folder, file_name):
-        """Download the camera's JPEG and keep a copy on disk."""
+        """Download the camera's JPEG and keep a copy on disk.
+
+        Returns the raw JPEG bytes rather than a PIL image: the caller can
+        pass them on untouched and save a decode/encode round trip.
+        """
         logging.info("Downloading JPEG file: {}".format(file_name))
 
         camera_file = self._fileGet(folder, file_name, gp.GP_FILE_TYPE_NORMAL)
@@ -232,7 +236,7 @@ class CameraGphoto2(CameraInterface):
             # A failing backup must not cost us the picture.
             logging.error("Could not write JPEG backup: {}".format(e))
 
-        return Image.open(io.BytesIO(file_data))
+        return file_data
 
     def _getJpegFromRaw(self, folder, file_name):
         """Fallback for cameras configured to write RAW only.
@@ -262,6 +266,11 @@ class CameraGphoto2(CameraInterface):
         return Image.fromarray(rgb)
 
     def getPicture(self):
+        """Take a picture.
+
+        Returns the JPEG bytes straight from the camera, or a PIL image when
+        a RAW file had to be developed instead. Camera handles both.
+        """
         try:
             file_info = self._cap.capture(gp.GP_CAPTURE_IMAGE, self._ctxt)
             logging.info(

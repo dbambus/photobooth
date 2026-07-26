@@ -67,6 +67,7 @@ class Camera:
         test_picture = self._cap.getPicture()
         if test_picture is None:
             raise RuntimeError('Camera did not return a test picture')
+        test_picture = self._toImage(test_picture)
         if self._rotation is not None:
             test_picture = test_picture.transpose(self._rotation)
 
@@ -161,11 +162,21 @@ class Camera:
         picture = self._cap.getPicture()
         if picture is None:
             raise RuntimeError('Camera did not return a picture')
-        if self._rotation is not None:
-            picture = picture.transpose(self._rotation)
-        logging.info('Got picture with size: {}'.format(picture.size))
-        byte_data = BytesIO()
-        picture.save(byte_data, format='jpeg')
+
+        if isinstance(picture, (bytes, bytearray)) and self._rotation is None:
+            # The camera already handed us a JPEG and nothing has to be
+            # changed about it, so pass it on as it is. Decoding and
+            # re-encoding 11 megapixels here would cost a good part of a
+            # second for an identical result.
+            byte_data = BytesIO(picture)
+        else:
+            picture = self._toImage(picture)
+            if self._rotation is not None:
+                picture = picture.transpose(self._rotation)
+            logging.info('Got picture with size: {}'.format(picture.size))
+            byte_data = BytesIO()
+            picture.save(byte_data, format='jpeg')
+
         self._pictures.append(byte_data)
         self.setActive()
 
@@ -184,10 +195,17 @@ class Camera:
 
         self.setIdle()
 
+        thumb_size = self._pic_dims.thumbnailSize
+
         picture = self._template.copy()
         for i in range(self._pic_dims.totalNumPictures):
             shot = Image.open(self._pictures[i])
-            resized = shot.resize(self._pic_dims.thumbnailSize)
+            # Let libjpeg decode at a reduced scale right away when the shot
+            # is larger than the thumbnail. It only steps down in powers of
+            # two, so a resize is still needed afterwards - but on far fewer
+            # pixels.
+            shot.draft('RGB', thumb_size)
+            resized = shot if shot.size == thumb_size else shot.resize(thumb_size)
             picture.paste(resized, self._pic_dims.thumbnailOffset[i])
 
         byte_data = BytesIO()

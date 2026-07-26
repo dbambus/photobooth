@@ -320,6 +320,11 @@ class CountdownMessage(QtWidgets.QFrame):
 
         # background image
         if self.picture is not None:
+            # The preview keeps the camera's aspect ratio, which rarely
+            # matches the screen. Fill the frame first so the bars beside the
+            # image are black instead of showing the style's background.
+            painter.fillRect(self.rect(), QtCore.Qt.black)
+
             pix = QtGui.QPixmap.fromImage(self.picture)
             pix = pix.scaled(
                 self.contentsRect().size(),
