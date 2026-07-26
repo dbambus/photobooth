@@ -19,15 +19,15 @@
 
 import logging
 
-from PyQt5 import QtCore, QtGui
-from PyQt5.QtPrintSupport import QPrinter
+from qtpy import QtCore, QtGui
+from qtpy.QtPrintSupport import QPrinter
 
 from . import Printer
 
 
 class PrinterPyQt5(Printer):
-    def __init__(self, page_size, print_pdf=False):
-        super().__init__(page_size)
+    def __init__(self, page_size, num_prints, print_pdf=False):
+        super().__init__(page_size, num_prints)
 
         self._printer = QPrinter(QPrinter.HighResolution)
         self._printer.setFullPage(True)
@@ -45,17 +45,18 @@ class PrinterPyQt5(Printer):
             self._printer.setOutputFormat(QPrinter.PdfFormat)
 
     def print(self, picture):
-        if self._print_pdf:
-            self._printer.setOutputFileName("print_%d.pdf" % self._counter)
-            self._counter += 1
+        for n in range(self.num_prints):
+            if self._print_pdf:
+                self._printer.setOutputFileName("print_%d.pdf" % self._counter)
+                self._counter += 1
 
-        logging.info("Printing picture")
-        logging.debug(
-            "Page Size: {}, Print Size: {}, PictureSize: {} ".format(
-                self._printer.paperRect(), self._printer.pageRect(), picture.rect()
+            logging.info("Printing picture, {} of {}".format(n + 1, self.num_prints))
+            logging.debug(
+                "Page Size: {}, Print Size: {}, PictureSize: {} ".format(
+                    self._printer.paperRect(), self._printer.pageRect(), picture.rect()
+                )
             )
-        )
 
-        painter = QtGui.QPainter(self._printer)
-        painter.drawImage(self._printer.pageRect(), picture, picture.rect())
-        painter.end()
+            painter = QtGui.QPainter(self._printer)
+            painter.drawImage(self._printer.pageRect(), picture, picture.rect())
+            painter.end()

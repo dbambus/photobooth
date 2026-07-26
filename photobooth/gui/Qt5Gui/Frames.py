@@ -22,9 +22,9 @@ import os
 import subprocess
 import sys
 
-from PyQt5 import QtCore
-from PyQt5 import QtGui
-from PyQt5 import QtWidgets
+from qtpy import QtCore
+from qtpy import QtGui
+from qtpy import QtWidgets
 
 from .. import modules
 from ... import camera
@@ -32,6 +32,7 @@ from ... import printer
 
 from . import Widgets
 from . import styles
+from . import PyQt5Gui
 
 
 class Welcome(QtWidgets.QFrame):
@@ -72,36 +73,44 @@ class Welcome(QtWidgets.QFrame):
 
 
 class IdleMessage(QtWidgets.QFrame):
-    def __init__(self, trigger_action):
+    def __init__(self, trigger_action, trigger_boomerang_action=None):
         super().__init__()
         self.setObjectName("IdleMessage")
 
         self._message_label = _("Hit the")
         self._message_button = _("Button!")
+        self._message_boomerang = _("Boomerang!")
 
-        self.initFrame(trigger_action)
+        self.initFrame(trigger_action, trigger_boomerang_action)
 
-    def initFrame(self, trigger_action):
+    def initFrame(self, trigger_action, trigger_boomerang_action=None):
         lbl = QtWidgets.QLabel(self._message_label)
         btn = QtWidgets.QPushButton(self._message_button)
         btn.clicked.connect(trigger_action)
+        if trigger_boomerang_action:
+            btn_boomerang = QtWidgets.QPushButton(self._message_boomerang)
+            btn_boomerang.clicked.connect(trigger_boomerang_action)
 
         lay = QtWidgets.QVBoxLayout()
         lay.addWidget(lbl)
         lay.addWidget(btn)
+        if trigger_boomerang_action:
+            lay.addWidget(btn_boomerang)
         self.setLayout(lay)
 
 
 class GreeterMessage(QtWidgets.QFrame):
-    def __init__(self, num_x, num_y, skip, countdown_action):
+    def __init__(self, num_x, num_y, skip, countdown_action, boomerang=None):
         super().__init__()
         self.setObjectName("GreeterMessage")
 
         self._text_title = _("Get ready!")
-        self._text_button = _("Start countdown")
+        self._text_button = _("Countdown wird gestartet")
 
         num_pictures = max(num_x * num_y - len(skip), 1)
-        if num_pictures > 1:
+        if boomerang:
+            self._text_label = _("for a Boomerang...")
+        elif num_pictures > 1:
             self._text_label = _("for {} pictures...").format(num_pictures)
         else:
             self._text_label = ""
@@ -125,15 +134,17 @@ class GreeterMessage(QtWidgets.QFrame):
 
 
 class CaptureMessage(QtWidgets.QFrame):
-    def __init__(self, num_picture, num_x, num_y, skip):
+    def __init__(self, num_picture, num_x, num_y, skip, boomerang=None):
         super().__init__()
         self.setObjectName("PoseMessage")
 
         num_pictures = max(num_x * num_y - len(skip), 1)
-        if num_pictures > 1:
+        if boomerang:
+            self._text = _("Taking a Boomerang...")
+        elif num_pictures > 1:
             self._text = _("Picture {} of {}...").format(num_picture, num_pictures)
         else:
-            self._text = "Taking a photo..."
+            self._text = _("Taking a photo...")
 
         self.initFrame()
 
@@ -172,6 +183,38 @@ class PictureMessage(QtWidgets.QFrame):
         painter = QtGui.QPainter(self)
         self._paintPicture(painter)
         painter.end()
+
+
+class GIFMessage(QtWidgets.QFrame):
+    def __init__(self, gif):
+        super().__init__()
+        self.setObjectName("GIFMessage")
+
+        self.initFrame(gif)
+
+    def initFrame(self, gif):
+        # make sure that we are at start of stream and load into movie
+        gif.seek(0)
+        self.a = QtCore.QByteArray.fromRawData(gif.getvalue())
+        self.b = QtCore.QBuffer(self.a)
+        self.b.open(QtCore.QIODevice.ReadOnly)
+        self.movie = QtGui.QMovie(self.b, b"gif", self)
+
+        size = self.movie.scaledSize()
+        self.setGeometry(200, 200, size.width(), size.height())
+        self.movie_screen = QtWidgets.QLabel("GIF")
+        self.movie_screen.setSizePolicy(
+            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.MinimumExpanding,
+        )
+        lay = QtWidgets.QVBoxLayout()
+        lay.addWidget(self.movie_screen)
+        self.setLayout(lay)
+        self.movie.setCacheMode(QtGui.QMovie.CacheAll)
+        self.movie_screen.setMovie(self.movie)
+        self.movie_screen.setScaledContents(False)
+        logging.debug("Return value of movie.isValid: {}".format(self.movie.isValid()))
+        self.movie.start()
 
 
 class WaitMessage(QtWidgets.QFrame):
@@ -214,14 +257,16 @@ class WaitMessage(QtWidgets.QFrame):
 
 
 class CountdownMessage(QtWidgets.QFrame):
-    def __init__(self, time, action):
+    def __init__(self, time, action, audio):
         super().__init__()
         self.setObjectName("CountdownMessage")
 
         self._step_size = 50
         self._value = time * (1000 // self._step_size)
+        self._bar_value_old_int = self._value / (1000 // self._step_size)
         self._action = action
         self._picture = None
+        self._audio = audio
 
         self._initProgressBar(time)
 
@@ -246,10 +291,15 @@ class CountdownMessage(QtWidgets.QFrame):
 
     def _initProgressBar(self, time):
         self._bar = Widgets.RoundProgressBar(0, time, time)
-        self._bar.setFixedSize(200, 200)
+        self._bar.setFixedSize(500, 500)
 
     def _updateProgressBar(self):
         self._bar.value = self._value / (1000 // self._step_size)
+        if self._audio.do_play_audio:
+            diff = self._bar_value_old_int - int(self._bar.value)
+            if diff > 0:
+                self._audio.beep()
+            self._bar_value_old_int = int(self._bar.value)
 
     def showEvent(self, event):
         self._timer = self.startTimer(self._step_size)
@@ -259,6 +309,7 @@ class CountdownMessage(QtWidgets.QFrame):
 
         if self.value == 0:
             self.killTimer(self._timer)
+            self._audio.shutter()
             self._action()
         else:
             self._updateProgressBar()
@@ -442,11 +493,13 @@ class Settings(QtWidgets.QFrame):
         tabs.addTab(self.createPhotoboothSettings(), _("Photobooth"))
         tabs.addTab(self.createCameraSettings(), _("Camera"))
         tabs.addTab(self.createPictureSettings(), _("Picture"))
+        tabs.addTab(self.createGIFSettings(), _("GIF"))
         tabs.addTab(self.createStorageSettings(), _("Storage"))
         tabs.addTab(self.createGpioSettings(), _("GPIO"))
         tabs.addTab(self.createPrinterSettings(), _("Printer"))
         tabs.addTab(self.createMailerSettings(), _("Mailer"))
         tabs.addTab(self.createUploadSettings(), _("Upload"))
+        tabs.addTab(self.createAudioSettings(), _("Audio"))
         return tabs
 
     def createButtons(self):
@@ -558,6 +611,11 @@ class Settings(QtWidgets.QFrame):
         )
         self.add("Photobooth", "overwrite_error_message", err_msg)
 
+        capture_retry = QtWidgets.QSpinBox()
+        capture_retry.setRange(0, 10)
+        capture_retry.setValue(self._cfg.getInt("Photobooth", "capture_error_retry"))
+        self.add("Photobooth", "capture_error_retry", capture_retry)
+
         layout = QtWidgets.QFormLayout()
         layout.addRow(_("Show preview during countdown:"), preview)
         layout.addRow(_("Greeter time before countdown [s]:"), greet_time)
@@ -565,6 +623,7 @@ class Settings(QtWidgets.QFrame):
         layout.addRow(_("Picture display time [s]:"), displ_time)
         layout.addRow(_("Postprocess timeout [s]:"), postproc_time)
         layout.addRow(_("Overwrite displayed error message:"), err_msg)
+        layout.addRow(_("Retries on capture error:"), capture_retry)
 
         widget = QtWidgets.QWidget()
         widget.setLayout(layout)
@@ -651,6 +710,9 @@ class Settings(QtWidgets.QFrame):
         bg = QtWidgets.QLineEdit(self._cfg.get("Picture", "background"))
         self.add("Picture", "background", bg)
 
+        ov = QtWidgets.QLineEdit(self._cfg.get("Picture", "overlay"))
+        self.add("Picture", "overlay", ov)
+
         lay_num = QtWidgets.QHBoxLayout()
         lay_num.addWidget(num_x)
         lay_num.addWidget(QtWidgets.QLabel("x"))
@@ -689,6 +751,21 @@ class Settings(QtWidgets.QFrame):
         lay_file.addWidget(bg)
         lay_file.addWidget(file_button)
 
+        def ov_file_dialog():
+            dialog = QtWidgets.QFileDialog.getOpenFileName
+            ov.setText(
+                dialog(
+                    self, _("Select file"), os.path.expanduser("~"), "Images (*.png)"
+                )[0]
+            )
+
+        ov_file_button = QtWidgets.QPushButton(_("Select file"))
+        ov_file_button.clicked.connect(ov_file_dialog)
+
+        lay_ov_file = QtWidgets.QHBoxLayout()
+        lay_ov_file.addWidget(ov)
+        lay_ov_file.addWidget(ov_file_button)
+
         layout = QtWidgets.QFormLayout()
         layout.addRow(_("Number of shots per picture:"), lay_num)
         layout.addRow(_("Size of assembled picture [px]:"), lay_size)
@@ -696,6 +773,51 @@ class Settings(QtWidgets.QFrame):
         layout.addRow(_("Min. distance border to shots [px]:"), lay_outer_dist)
         layout.addRow(_("Skip pictures:"), skip)
         layout.addRow(_("Background image:"), lay_file)
+        layout.addRow(_("Overlay image:"), lay_ov_file)
+
+        widget = QtWidgets.QWidget()
+        widget.setLayout(layout)
+        return widget
+
+    def createGIFSettings(self):
+        self.init("GIF")
+
+        enable = QtWidgets.QCheckBox()
+        enable.setChecked(self._cfg.getBool("GIF", "enable"))
+        self.add("GIF", "enable", enable)
+
+        num_frames = QtWidgets.QSpinBox()
+        num_frames.setRange(1, 99)
+        num_frames.setValue(self._cfg.getInt("GIF", "num_frames"))
+        self.add("GIF", "num_frames", num_frames)
+
+        frame_duration = QtWidgets.QSpinBox()
+        frame_duration.setRange(1, 9999)
+        frame_duration.setValue(self._cfg.getInt("GIF", "frame_duration"))
+        self.add("GIF", "frame_duration", frame_duration)
+
+        use_nth_capture = QtWidgets.QSpinBox()
+        use_nth_capture.setRange(1, 9999)
+        use_nth_capture.setValue(self._cfg.getInt("GIF", "use_nth_capture"))
+        self.add("GIF", "use_nth_capture", use_nth_capture)
+
+        lay_enable = QtWidgets.QHBoxLayout()
+        lay_enable.addWidget(enable)
+
+        lay_num = QtWidgets.QHBoxLayout()
+        lay_num.addWidget(num_frames)
+
+        lay_duration = QtWidgets.QHBoxLayout()
+        lay_duration.addWidget(frame_duration)
+
+        lay_use_nth = QtWidgets.QHBoxLayout()
+        lay_use_nth.addWidget(use_nth_capture)
+
+        layout = QtWidgets.QFormLayout()
+        layout.addRow(_("Enable:"), lay_enable)
+        layout.addRow(_("Number of frames in final GIF:"), lay_num)
+        layout.addRow(_("Duration of one frame in final GIF:"), lay_duration)
+        layout.addRow(_("Use every nth image from capture:"), lay_use_nth)
 
         widget = QtWidgets.QWidget()
         widget.setLayout(layout)
@@ -713,9 +835,16 @@ class Settings(QtWidgets.QFrame):
         keep_pictures.setChecked(self._cfg.getBool("Storage", "keep_pictures"))
         self.add("Storage", "keep_pictures", keep_pictures)
 
-        def directory_dialog():
+        single_extra = QtWidgets.QCheckBox()
+        single_extra.setChecked(self._cfg.getBool("Storage", "single_extra"))
+        self.add("Storage", "single_extra", single_extra)
+
+        basedir_single = QtWidgets.QLineEdit(self._cfg.get("Storage", "basedir_single"))
+        self.add("Storage", "basedir_single", basedir_single)
+
+        def directory_dialog(target):
             dialog = QtWidgets.QFileDialog.getExistingDirectory
-            basedir.setText(
+            target.setText(
                 dialog(
                     self,
                     _("Select directory"),
@@ -724,17 +853,34 @@ class Settings(QtWidgets.QFrame):
                 )
             )
 
+        def directory_dialog_basedir():
+            directory_dialog(basedir)
+
         dir_button = QtWidgets.QPushButton(_("Select directory"))
-        dir_button.clicked.connect(directory_dialog)
+        dir_button.clicked.connect(directory_dialog_basedir)
 
         lay_dir = QtWidgets.QHBoxLayout()
         lay_dir.addWidget(basedir)
         lay_dir.addWidget(dir_button)
 
+        def directory_dialog_single():
+            directory_dialog(basedir_single)
+
+        dir_button_single = QtWidgets.QPushButton(_("Select directory"))
+        dir_button_single.clicked.connect(directory_dialog_single)
+
+        lay_dir_single = QtWidgets.QHBoxLayout()
+        lay_dir_single.addWidget(basedir_single)
+        lay_dir_single.addWidget(dir_button_single)
+
         layout = QtWidgets.QFormLayout()
         layout.addRow(_("Output directory (strftime possible):"), lay_dir)
         layout.addRow(_("Basename of files (strftime possible):"), basename)
         layout.addRow(_("Keep single shots:"), keep_pictures)
+        layout.addRow(_("Store single shots in different directory:"), single_extra)
+        layout.addRow(
+            _("Directory for single shots (strftime possible):"), lay_dir_single
+        )
 
         widget = QtWidgets.QWidget()
         widget.setLayout(layout)
@@ -793,6 +939,67 @@ class Settings(QtWidgets.QFrame):
         widget.setLayout(layout)
         return widget
 
+    def createAudioSettings(self):
+        self.init("Audio")
+
+        enable = QtWidgets.QCheckBox()
+        enable.setChecked(self._cfg.getBool("Audio", "enable"))
+        self.add("Audio", "enable", enable)
+
+        volume = QtWidgets.QDoubleSpinBox()
+        volume.setRange(0, 1.0)
+        volume.setSingleStep(0.05)
+        volume.setValue(self._cfg.getFloat("Audio", "volume"))
+        self.add("Audio", "volume", volume)
+
+        beep = QtWidgets.QLineEdit(self._cfg.get("Audio", "beep_wav"))
+        self.add("Audio", "beep_wav", beep)
+
+        shutter = QtWidgets.QLineEdit(self._cfg.get("Audio", "shutter_wav"))
+        self.add("Audio", "shutter_wav", shutter)
+
+        def file_dialog_beep():
+            dialog = QtWidgets.QFileDialog.getOpenFileName
+            beep.setText(
+                dialog(
+                    self, _("Select file"), os.path.expanduser("~"), "WAV-Audio (*.wav)"
+                )[0]
+            )
+
+        def file_dialog_shutter():
+            dialog = QtWidgets.QFileDialog.getOpenFileName
+            shutter.setText(
+                dialog(
+                    self, _("Select file"), os.path.expanduser("~"), "WAV-Audio (*.wav)"
+                )[0]
+            )
+
+        beep_file_button = QtWidgets.QPushButton(_("Select file"))
+        beep_file_button.clicked.connect(file_dialog_beep)
+
+        shutter_file_button = QtWidgets.QPushButton(_("Select file"))
+        shutter_file_button.clicked.connect(file_dialog_shutter)
+
+        lay_file_beep = QtWidgets.QHBoxLayout()
+        lay_file_beep.addWidget(beep)
+        lay_file_beep.addWidget(beep_file_button)
+
+        lay_file_shutter = QtWidgets.QHBoxLayout()
+        lay_file_shutter.addWidget(shutter)
+        lay_file_shutter.addWidget(shutter_file_button)
+
+        layout = QtWidgets.QFormLayout()
+        layout.addRow(_("Play Audio:"), enable)
+        layout.addRow(_("Volume [0 - 1.0]:"), volume)
+        layout.addRow(_("Audio that is played every countdown second:"), lay_file_beep)
+        layout.addRow(
+            _("Audio that is played when countdown finishes:"), lay_file_shutter
+        )
+
+        widget = QtWidgets.QWidget()
+        widget.setLayout(layout)
+        return widget
+
     def createPrinterSettings(self):
         self.init("Printer")
 
@@ -827,12 +1034,18 @@ class Settings(QtWidgets.QFrame):
         lay_size.addWidget(QtWidgets.QLabel("x"))
         lay_size.addWidget(height)
 
+        num_prints = QtWidgets.QSpinBox()
+        num_prints.setRange(1, 99)
+        num_prints.setValue(self._cfg.getInt("Printer", "num_prints"))
+        self.add("Printer", "num_prints", num_prints)
+
         layout = QtWidgets.QFormLayout()
         layout.addRow(_("Enable printing:"), enable)
         layout.addRow(_("Module:"), module)
         layout.addRow(_("Print to PDF (for debugging):"), pdf)
         layout.addRow(_("Ask for confirmation before printing:"), confirmation)
         layout.addRow(_("Paper size [mm]:"), lay_size)
+        layout.addRow(_("Number of prints from one image:"), num_prints)
 
         widget = QtWidgets.QWidget()
         widget.setLayout(layout)
@@ -980,6 +1193,11 @@ class Settings(QtWidgets.QFrame):
             "overwrite_error_message",
             self.get("Photobooth", "overwrite_error_message").text(),
         )
+        self._cfg.set(
+            "Photobooth",
+            "capture_error_retry",
+            self.get("Photobooth", "capture_error_retry").text(),
+        )
 
         self._cfg.set(
             "Camera",
@@ -1010,6 +1228,14 @@ class Settings(QtWidgets.QFrame):
         )
         self._cfg.set("Picture", "skip", self.get("Picture", "skip").text())
         self._cfg.set("Picture", "background", self.get("Picture", "background").text())
+        self._cfg.set("Picture", "overlay", self.get("Picture", "overlay").text())
+
+        self._cfg.set("GIF", "enable", str(self.get("GIF", "enable").isChecked()))
+        self._cfg.set("GIF", "num_frames", self.get("GIF", "num_frames").text())
+        self._cfg.set("GIF", "frame_duration", self.get("GIF", "frame_duration").text())
+        self._cfg.set(
+            "GIF", "use_nth_capture", self.get("GIF", "use_nth_capture").text()
+        )
 
         self._cfg.set("Storage", "basedir", self.get("Storage", "basedir").text())
         self._cfg.set("Storage", "basename", self.get("Storage", "basename").text())
@@ -1017,6 +1243,14 @@ class Settings(QtWidgets.QFrame):
             "Storage",
             "keep_pictures",
             str(self.get("Storage", "keep_pictures").isChecked()),
+        )
+        self._cfg.set(
+            "Storage",
+            "single_extra",
+            str(self.get("Storage", "single_extra").isChecked()),
+        )
+        self._cfg.set(
+            "Storage", "basedir_single", self.get("Storage", "basedir_single").text()
         )
 
         self._cfg.set("Gpio", "enable", str(self.get("Gpio", "enable").isChecked()))
@@ -1026,6 +1260,13 @@ class Settings(QtWidgets.QFrame):
         self._cfg.set("Gpio", "chan_r_pin", self.get("Gpio", "chan_r_pin").text())
         self._cfg.set("Gpio", "chan_g_pin", self.get("Gpio", "chan_g_pin").text())
         self._cfg.set("Gpio", "chan_b_pin", self.get("Gpio", "chan_b_pin").text())
+
+        self._cfg.set("Audio", "enable", str(self.get("Audio", "enable").isChecked()))
+        self._cfg.set("Audio", "beep_wav", self.get("Audio", "beep_wav").text())
+        self._cfg.set("Audio", "shutter_wav", self.get("Audio", "shutter_wav").text())
+        self._cfg.set(
+            "Audio", "volume", "{:.2f}".format(self.get("Audio", "volume").value())
+        )
 
         self._cfg.set(
             "Printer", "enable", str(self.get("Printer", "enable").isChecked())
@@ -1043,6 +1284,7 @@ class Settings(QtWidgets.QFrame):
         )
         self._cfg.set("Printer", "width", self.get("Printer", "width").text())
         self._cfg.set("Printer", "height", self.get("Printer", "height").text())
+        self._cfg.set("Printer", "num_prints", self.get("Printer", "num_prints").text())
 
         self._cfg.set("Mailer", "enable", str(self.get("Mailer", "enable").isChecked()))
         self._cfg.set("Mailer", "sender", self.get("Mailer", "sender").text())

@@ -19,10 +19,20 @@
 
 import logging
 import os
+import io
 
-from PyQt5 import QtCore
-from PyQt5 import QtGui
-from PyQt5 import QtWidgets
+from qtpy import QtCore
+from qtpy import QtGui
+from qtpy import QtWidgets
+from qtpy.QtGui import QImage, QPixmap
+
+__QTMULTIMEDIAIMPORTED__ = False
+try:
+    from qtpy import QtMultimedia
+
+    __QTMULTIMEDIAIMPORTED__ = True
+except ImportError:
+    __QTMULTIMEDIAIMPORTED__ = False
 
 from PIL import Image, ImageQt
 
@@ -39,9 +49,7 @@ from . import Worker
 
 
 class PyQt5Gui(GuiSkeleton):
-
     def __init__(self, argv, config, comm):
-
         super().__init__(comm)
 
         self._cfg = config
@@ -53,20 +61,21 @@ class PyQt5Gui(GuiSkeleton):
         self._picture = None
         self._postprocess = GuiPostprocessor(self._cfg)
 
-    def run(self):
+        self._is_gif_enabled = self._cfg.getBool("GIF", "enable")
+        self._audio = AudioHelper(self._cfg)
 
+    def run(self):
         exit_code = self._app.exec_()
         self._gui = None
         return exit_code
 
     def _initUI(self, argv):
-
         self._disableTrigger()
 
         # Load stylesheet
-        style = self._cfg.get('Gui', 'style')
+        style = self._cfg.get("Gui", "style")
         filename = next((file for name, file in styles if name == style))
-        with open(os.path.join(os.path.dirname(__file__), filename), 'r') as f:
+        with open(os.path.join(os.path.dirname(__file__), filename), "r") as f:
             stylesheet = f.read()
 
         # Create application and main window
@@ -75,199 +84,305 @@ class PyQt5Gui(GuiSkeleton):
         self._gui = PyQt5MainWindow(self._cfg, self._handleKeypressEvent)
 
         # Load additional fonts
-        fonts = ['photobooth/gui/Qt5Gui/fonts/AmaticSC-Regular.ttf',
-                 'photobooth/gui/Qt5Gui/fonts/AmaticSC-Bold.ttf']
+        fonts = [
+            "photobooth/gui/Qt5Gui/fonts/AmaticSC-Regular.ttf",
+            "photobooth/gui/Qt5Gui/fonts/AmaticSC-Bold.ttf",
+        ]
         self._fonts = QtGui.QFontDatabase()
         for font in fonts:
             self._fonts.addApplicationFont(font)
 
     def _initReceiver(self):
-
         # Create receiver thread
         self._receiver = Receiver.Receiver(self._comm)
         self._receiver.notify.connect(self.handleState)
         self._receiver.start()
 
     def _initWorker(self):
-
         # Create worker thread for time consuming tasks to keep gui responsive
         self._worker = Worker.Worker(self._comm)
         self._worker.start()
 
     def _enableEscape(self):
-
         self._is_escape = True
 
     def _disableEscape(self):
-
         self._is_escape = False
 
     def _enableTrigger(self):
-
         self._is_trigger = True
 
     def _disableTrigger(self):
-
         self._is_trigger = False
 
     def _setWidget(self, widget):
-
         self._gui.setCentralWidget(widget)
 
     def close(self):
-
         if self._gui.close():
             self._comm.send(Workers.MASTER, TeardownEvent(TeardownEvent.EXIT))
 
     def teardown(self, state):
-
         if state.target == TeardownEvent.WELCOME:
-            self._comm.send(Workers.MASTER, GuiEvent('welcome'))
+            self._comm.send(Workers.MASTER, GuiEvent("welcome"))
         elif state.target in (TeardownEvent.EXIT, TeardownEvent.RESTART):
             self._worker.put(None)
             self._app.exit(0)
 
     def showError(self, state):
+        logging.error("%s: %s", state.origin, state.message)
 
-        logging.error('%s: %s', state.origin, state.message)
-
-        err_msg = self._cfg.get('Photobooth', 'overwrite_error_message')
+        err_msg = self._cfg.get("Photobooth", "overwrite_error_message")
         if len(err_msg) > 0:
             message = err_msg
         else:
-            message = 'Error: ' + state.message
+            message = "Error: " + state.message
 
         reply = QtWidgets.QMessageBox.critical(
-            self._gui, state.origin, message,
+            self._gui,
+            state.origin,
+            message,
             QtWidgets.QMessageBox.Retry | QtWidgets.QMessageBox.Cancel,
-            QtWidgets.QMessageBox.Cancel)
+            QtWidgets.QMessageBox.Cancel,
+        )
 
         if reply == QtWidgets.QMessageBox.Retry:
-            self._comm.send(Workers.MASTER, GuiEvent('retry'))
+            self._comm.send(Workers.MASTER, GuiEvent("retry"))
         else:
-            self._comm.send(Workers.MASTER, GuiEvent('abort'))
+            self._comm.send(Workers.MASTER, GuiEvent("abort"))
+            
+    def get_pixmap_from_pil(pil_img):
+        """Converts a PIL image to a QPixmap without using PIL.ImageQt"""
+        # 1. Convert to RGB to ensure compatibility
+        if pil_img.mode != "RGB":
+            pil_img = pil_img.convert("RGB")
+        
+        # 2. Save to a byte buffer (RAM)
+        byte_array = io.BytesIO()
+        pil_img.save(byte_array, format='PNG')
+    
+        # 3. Load into Qt
+        q_image = QImage()
+        q_image.loadFromData(byte_array.getvalue())
+    
+        return QPixmap.fromImage(q_image)         
 
     def showWelcome(self, state):
-
         self._disableTrigger()
         self._disableEscape()
-        self._setWidget(Frames.Welcome(
-            lambda: self._comm.send(Workers.MASTER, GuiEvent('start')),
-            self._showSetDateTime, self._showSettings, self.close))
+        self._setWidget(
+            Frames.Welcome(
+                lambda: self._comm.send(Workers.MASTER, GuiEvent("start")),
+                self._showSetDateTime,
+                self._showSettings,
+                self.close,
+            )
+        )
         if QtWidgets.QApplication.overrideCursor() != 0:
             QtWidgets.QApplication.restoreOverrideCursor()
 
     def showStartup(self, state):
-
         self._disableTrigger()
         self._enableEscape()
-        self._setWidget(Frames.WaitMessage(_('Starting the photobooth...')))
-        if self._cfg.getBool('Gui', 'hide_cursor'):
+        self._setWidget(Frames.WaitMessage(_("Starting the photobooth...")))
+        if self._cfg.getBool("Gui", "hide_cursor"):
             QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.BlankCursor)
 
     def showIdle(self, state):
-
         self._enableEscape()
         self._enableTrigger()
-        self._setWidget(Frames.IdleMessage(
-            lambda: self._comm.send(Workers.MASTER, GuiEvent('trigger'))))
+        if self._is_gif_enabled:
+            self._setWidget(
+                Frames.IdleMessage(
+                    lambda: self._comm.send(Workers.MASTER, GuiEvent("trigger")),
+                    lambda: self._comm.send(Workers.MASTER, GuiEvent("triggerVideo")),
+                )
+            )
+        else:
+            self._setWidget(
+                Frames.IdleMessage(
+                    lambda: self._comm.send(Workers.MASTER, GuiEvent("trigger"))
+                )
+            )
 
     def showGreeter(self, state):
-
         self._enableEscape()
         self._disableTrigger()
 
-        num_pic = (self._cfg.getInt('Picture', 'num_x'),
-                   self._cfg.getInt('Picture', 'num_y'))
-        skip = [i for i in self._cfg.getIntList('Picture', 'skip')
-                if 1 <= i and i <= num_pic[0] * num_pic[1]]
-        greeter_time = self._cfg.getInt('Photobooth', 'greeter_time') * 1000
+        num_pic = (
+            self._cfg.getInt("Picture", "num_x"),
+            self._cfg.getInt("Picture", "num_y"),
+        )
+        skip = [
+            i
+            for i in self._cfg.getIntList("Picture", "skip")
+            if 1 <= i <= num_pic[0] * num_pic[1]
+        ]
+        greeter_time = self._cfg.getInt("Photobooth", "greeter_time") * 1000
 
-        self._setWidget(Frames.GreeterMessage(
-            *num_pic, skip,
-            lambda: self._comm.send(Workers.MASTER, GuiEvent('countdown'))))
+        self._setWidget(
+            Frames.GreeterMessage(
+                *num_pic,
+                skip,
+                lambda: self._comm.send(Workers.MASTER, GuiEvent("countdown")),
+                state.gif,
+            )
+        )
         QtCore.QTimer.singleShot(
-            greeter_time,
-            lambda: self._comm.send(Workers.MASTER, GuiEvent('countdown')))
+            greeter_time, lambda: self._comm.send(Workers.MASTER, GuiEvent("countdown"))
+        )
 
     def showCountdown(self, state):
-
-        countdown_time = self._cfg.getInt('Photobooth', 'countdown_time')
-        self._setWidget(Frames.CountdownMessage(
-            countdown_time,
-            lambda: self._comm.send(Workers.MASTER, GuiEvent('capture'))))
+        countdown_time = self._cfg.getInt("Photobooth", "countdown_time")
+        self._setWidget(
+            Frames.CountdownMessage(
+                countdown_time,
+                lambda: self._comm.send(Workers.MASTER, GuiEvent("capture")),
+                self._audio,
+            )
+        )
 
     def updateCountdown(self, event):
-
-        picture = Image.open(event.picture)
-        self._gui.centralWidget().picture = ImageQt.ImageQt(picture)
+        pil_picture = Image.open(event.picture)
+        
+        if pil_picture.mode != "RGB":
+            pil_picture = pil_picture.convert("RGB")
+            
+        buffer = io.BytesIO()
+        pil_picture.save(buffer, format="jpeg")
+        
+        q_image = QImage()
+        q_image.loadFromData(buffer.getvalue())
+        
+        self._gui.centralWidget().picture = q_image
         self._gui.centralWidget().update()
 
-    def showCapture(self, state):
+#    def updateCountdown(self, event):
+#        picture = Image.open(event.picture)
+#        self._gui.centralWidget().picture = ImageQt.imageQt(picture)
+#       self._gui.centralWidget().update()
 
-        num_pic = (self._cfg.getInt('Picture', 'num_x'),
-                   self._cfg.getInt('Picture', 'num_y'))
-        skip = [i for i in self._cfg.getIntList('Picture', 'skip')
-                if 1 <= i and i <= num_pic[0] * num_pic[1]]
-        self._setWidget(Frames.CaptureMessage(state.num_picture, *num_pic,
-                                              skip))
+    def showCapture(self, state):
+        num_pic = (
+            self._cfg.getInt("Picture", "num_x"),
+            self._cfg.getInt("Picture", "num_y"),
+        )
+        skip = [
+            i
+            for i in self._cfg.getIntList("Picture", "skip")
+            if 1 <= i and i <= num_pic[0] * num_pic[1]
+        ]
+        self._setWidget(
+            Frames.CaptureMessage(state.num_picture, *num_pic, skip, state.gif)
+        )
 
     def showAssemble(self, state):
+        self._setWidget(Frames.WaitMessage(_("Processing picture...")))
 
-        self._setWidget(Frames.WaitMessage(_('Processing picture...')))
+    def _pil_to_qimage(self, path):
+        """Helper to safely convert a file path to a QImage via PIL"""
+        with Image.open(path) as pil_img:
+            if pil_img.mode != "RGB":
+                pil_img = pil_img.convert("RGB")
+            
+            byte_array = io.BytesIO()
+            pil_img.save(byte_array, format='jpeg')
+            
+            q_img = QImage()
+            q_img.loadFromData(byte_array.getvalue())
+            return q_img
 
     def showReview(self, state):
+        # Convert the picture once at the start
+        self._picture = self._pil_to_qimage(state.picture)
+        review_time = self._cfg.getInt("Photobooth", "display_time") * 1000
 
-        picture = Image.open(state.picture)
-        self._picture = ImageQt.ImageQt(picture)
-        review_time = self._cfg.getInt('Photobooth', 'display_time') * 1000
-        self._setWidget(Frames.PictureMessage(self._picture))
-        QtCore.QTimer.singleShot(
-            review_time,
-            lambda: self._comm.send(Workers.MASTER, GuiEvent('postprocess')))
-        self._postprocess.do(self._picture)
+        if state.gif:
+            self._setWidget(Frames.GIFMessage(state.picture))
+            QtCore.QTimer.singleShot(
+                review_time,
+                lambda: self._comm.send(Workers.MASTER, GuiEvent("postprocess")),
+            )
+            self._postprocess.do(self._picture, gif=True)
+        else:
+            self._setWidget(Frames.PictureMessage(self._picture))
+            QtCore.QTimer.singleShot(
+                review_time,
+                lambda: self._comm.send(Workers.MASTER, GuiEvent("postprocess")),
+            )
+            self._postprocess.do(self._picture)
+
+#    def showReview(self, state):
+#        if state.gif:
+#            review_time = self._cfg.getInt("Photobooth", "display_time") * 1000
+#            self._setWidget(Frames.GIFMessage(state.picture))
+#            QtCore.QTimer.singleShot(
+#                review_time,
+#                lambda: self._comm.send(Workers.MASTER, GuiEvent("postprocess")),
+#            )
+#            picture = Image.open(state.picture)
+#            self._picture = ImageQt.imageQt(picture)
+#            self._postprocess.do(self._picture, gif=True)
+#        else:
+#           picture = Image.open(state.picture)
+#            self._picture = ImageQt.imageQt(picture)
+#            review_time = self._cfg.getInt("Photobooth", "display_time") * 1000
+#            self._setWidget(Frames.PictureMessage(self._picture))
+#            QtCore.QTimer.singleShot(
+#                review_time,
+#                lambda: self._comm.send(Workers.MASTER, GuiEvent("postprocess")),
+#            )
+#            self._postprocess.do(self._picture)
 
     def showPostprocess(self, state):
-
-        tasks = self._postprocess.get(self._picture)
-        postproc_t = self._cfg.getInt('Photobooth', 'postprocess_time')
+        tasks = self._postprocess.get(self._picture, state.gif)
+        postproc_t = self._cfg.getInt("Photobooth", "postprocess_time")
 
         Frames.PostprocessMessage(
-            self._gui.centralWidget(), tasks, self._worker,
-            lambda: self._comm.send(Workers.MASTER, GuiEvent('idle')),
-            postproc_t * 1000)
+            self._gui.centralWidget(),
+            tasks,
+            self._worker,
+            lambda: self._comm.send(Workers.MASTER, GuiEvent("idle")),
+            postproc_t * 1000,
+        )
 
     def _handleKeypressEvent(self, event):
-
         if self._is_escape and event.key() == QtCore.Qt.Key_Escape:
-            self._comm.send(Workers.MASTER,
-                            TeardownEvent(TeardownEvent.WELCOME))
+            self._comm.send(Workers.MASTER, TeardownEvent(TeardownEvent.WELCOME))
         elif self._is_trigger and event.key() == QtCore.Qt.Key_Space:
-            self._comm.send(Workers.MASTER, GuiEvent('trigger'))
+            self._comm.send(Workers.MASTER, GuiEvent("trigger"))
+        elif self._is_trigger and event.key() == QtCore.Qt.Key_B:
+            self._comm.send(Workers.MASTER, GuiEvent("triggerVideo"))
 
     def _showSetDateTime(self):
-
         self._disableTrigger()
         self._disableEscape()
-        self._setWidget(Frames.SetDateTime(
-            self.showWelcome,
-            lambda: self._comm.send(Workers.MASTER,
-                                    TeardownEvent(TeardownEvent.RESTART))))
+        self._setWidget(
+            Frames.SetDateTime(
+                self.showWelcome,
+                lambda: self._comm.send(
+                    Workers.MASTER, TeardownEvent(TeardownEvent.RESTART)
+                ),
+            )
+        )
 
     def _showSettings(self):
-
         self._disableTrigger()
         self._disableEscape()
-        self._setWidget(Frames.Settings(
-            self._cfg, self._showSettings, self.showWelcome,
-            lambda: self._comm.send(Workers.MASTER,
-                                    TeardownEvent(TeardownEvent.RESTART))))
+        self._setWidget(
+            Frames.Settings(
+                self._cfg,
+                self._showSettings,
+                self.showWelcome,
+                lambda: self._comm.send(
+                    Workers.MASTER, TeardownEvent(TeardownEvent.RESTART)
+                ),
+            )
+        )
 
 
 class PyQt5MainWindow(QtWidgets.QMainWindow):
-
     def __init__(self, config, keypress_handler):
-
         super().__init__()
 
         self._cfg = config
@@ -275,23 +390,24 @@ class PyQt5MainWindow(QtWidgets.QMainWindow):
         self._initUI()
 
     def _initUI(self):
+        self.setWindowTitle("Photobooth")
 
-        self.setWindowTitle('Photobooth')
-
-        if self._cfg.getBool('Gui', 'fullscreen'):
+        if self._cfg.getBool("Gui", "fullscreen"):
             self.showFullScreen()
         else:
-            self.setFixedSize(self._cfg.getInt('Gui', 'width'),
-                              self._cfg.getInt('Gui', 'height'))
+            self.setFixedSize(
+                self._cfg.getInt("Gui", "width"), self._cfg.getInt("Gui", "height")
+            )
             self.show()
 
     def closeEvent(self, e):
-
-        reply = QtWidgets.QMessageBox.question(self, _('Confirmation'),
-                                               _('Quit Photobooth?'),
-                                               QtWidgets.QMessageBox.Yes |
-                                               QtWidgets.QMessageBox.No,
-                                               QtWidgets.QMessageBox.No)
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            _("Confirmation"),
+            _("Quit Photobooth?"),
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.No,
+        )
 
         if reply == QtWidgets.QMessageBox.Yes:
             e.accept()
@@ -299,5 +415,49 @@ class PyQt5MainWindow(QtWidgets.QMainWindow):
             e.ignore()
 
     def keyPressEvent(self, event):
-
         self._handle_key(event)
+
+
+class AudioHelper(object):
+    def __init__(self, config, *args, **kwargs):
+        self._cfg = config
+        self._do_play_audio = self._cfg.getBool("Audio", "enable")
+        if self._do_play_audio and not __QTMULTIMEDIAIMPORTED__:
+            logging.error(
+                "Requested to play audio but QtMultimedia not installed in namespace. Disabling audio."
+            )
+            self._do_play_audio = False
+
+        if self._do_play_audio:
+            logging.info("Enabling countdown sounds")
+            self.audio_beep = QtMultimedia.QSoundEffect()
+            self.audio_shutter = QtMultimedia.QSoundEffect()
+            url_beep = QtCore.QUrl.fromLocalFile(self._cfg.get("Audio", "beep_wav"))
+            self.audio_beep.setSource(url_beep)
+            logging.info(f'Set countdown sound file: "{url_beep.path()}"')
+            url_shutter = QtCore.QUrl.fromLocalFile(
+                self._cfg.get("Audio", "shutter_wav")
+            )
+            self.audio_shutter.setSource(url_shutter)
+            logging.info(f'Set shutter sound file: "{url_shutter.path()}"')
+            # play only once
+            loop_count = 0
+            self.audio_beep.setLoopCount(loop_count)
+            self.audio_shutter.setLoopCount(loop_count)
+            # set volume
+            volume = self._cfg.getFloat("Audio", "volume")
+            self.audio_beep.setVolume(volume)
+            self.audio_shutter.setVolume(volume)
+            logging.info(f"Audio volume set to: {volume}")
+
+    @property
+    def do_play_audio(self):
+        return self._do_play_audio
+
+    def beep(self):
+        if self._do_play_audio:
+            self.audio_beep.play()
+
+    def shutter(self):
+        if self._do_play_audio:
+            self.audio_shutter.play()

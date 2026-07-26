@@ -25,8 +25,9 @@ modules = (
 
 
 class Printer:
-    def __init__(self, page_size):
+    def __init__(self, page_size, num_prints):
         self.pageSize = page_size
+        self.num_prints = num_prints
 
     @property
     def pageSize(self):

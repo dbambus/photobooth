@@ -26,7 +26,9 @@ class GuiPostprocessor:
         super().__init__()
 
         self._get_task_list = []
+        self._get_task_list_gif = []
         self._do_task_list = []
+        self._do_task_list_gif = []
 
         if config.getBool("Printer", "enable"):
             module = config.get("Printer", "module")
@@ -35,16 +37,29 @@ class GuiPostprocessor:
                 config.getInt("Printer", "height"),
             )
             pdf = config.getBool("Printer", "pdf")
+            num_prints = config.getInt("Printer", "num_prints")
             if config.getBool("Printer", "confirmation"):
-                self._get_task_list.append(PrintPostprocess(module, paper_size, pdf))
+                self._get_task_list.append(
+                    PrintPostprocess(module, paper_size, num_prints, pdf)
+                )
             else:
-                self._do_task_list.append(PrintPostprocess(module, paper_size, pdf))
+                self._do_task_list.append(
+                    PrintPostprocess(module, paper_size, num_prints, pdf)
+                )
 
-    def get(self, picture):
-        return [task.get(picture) for task in self._get_task_list]
+    def get(self, picture, gif=None):
+        if gif:
+            tasklist = self._get_task_list_gif
+        else:
+            tasklist = self._get_task_list
+        return [task.get(picture) for task in tasklist]
 
-    def do(self, picture):
-        for task in self._do_task_list:
+    def do(self, picture, gif=None):
+        if gif:
+            tasklist = self._do_task_list_gif
+        else:
+            tasklist = self._do_task_list
+        for task in tasklist:
             task.get(picture).action()
 
 
@@ -86,11 +101,11 @@ class PostprocessItem:
 
 
 class PrintPostprocess(PostprocessTask):
-    def __init__(self, printer_module, paper_size, is_pdf, **kwargs):
+    def __init__(self, printer_module, paper_size, num_prints, is_pdf, **kwargs):
         super().__init__(**kwargs)
 
         Printer = lookup_and_import(printer.modules, printer_module, "printer")
-        self._printer = Printer(paper_size, is_pdf)
+        self._printer = Printer(paper_size, num_prints, is_pdf)
 
     def get(self, picture):
-        return PostprocessItem("Print", lambda: self._printer.print(picture))
+        return PostprocessItem(_("Print"), lambda: self._printer.print(picture))

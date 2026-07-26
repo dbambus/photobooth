@@ -102,7 +102,7 @@ class PictureMailer(WorkerTask):
         self._password = config.get("Mailer", "password")
         self._is_tls = config.getBool("Mailer", "use_tls")
 
-    def do(self, picture, filename):
+    def do(self, picture, filename, gif=None):
         logging.info("Sending picture to %s", self._recipient)
         send_mail(
             self._sender,

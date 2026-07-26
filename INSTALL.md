@@ -53,8 +53,9 @@ You might be able to skip some packages if you plan on not using gphoto2.
 ### Install required packages
 In a terminal, enter the following commands
 ```bash
-sudo apt install python3-dev python3-pip virtualenv  
+sudo apt install python3-dev python3-pip virtualenv
 sudo apt install qt5-default pyqt5-dev pyqt5-dev-tools # for PyQt5-GUI
+sudo apt install python3-pyqt5.qtmultimedia
 sudo apt install gphoto2 libgphoto2-dev # to use gphoto2
 sudo apt install libcups2-dev # to use pycups
 ```
