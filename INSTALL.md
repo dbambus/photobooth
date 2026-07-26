@@ -110,6 +110,19 @@ You have to do this whenever you open a new terminal or rebooted your hardware
 source .venv/bin/activate
 ```
 
+#### Alternative: `uv`
+
+[uv](https://docs.astral.sh/uv/) resolves and installs considerably faster and
+pins the Python version explicitly, which avoids surprises on a rolling system.
+Instead of the two commands above, run
+```bash
+uv venv --python 3.13
+```
+`uv` fetches a matching interpreter if the system does not provide one.
+Activation works the same way, and `uv pip install` replaces `pip install` in
+the next step. `autostart.sh` calls `.venv/bin/python` directly, so it works
+with either variant.
+
 ### Install photobooth with dependencies
 Run the following command to download and install all dependencies and the photobooth:
 ```bash
@@ -126,6 +139,8 @@ These include:
 - `pyqt` if you want to install PyQt5 from PIP (doesn't work on Raspbian)
 - `picamera` if you want to use the Raspberry Pi camera module
 - `gphoto2-cffi` if you want to use the `gphoto2-cffi` bindings
+- `raw` if your camera writes RAW files without an accompanying JPEG, so they
+  have to be developed on the fly (not needed for the usual RAW+JPEG setup)
 
 ## Run Photobooth
 If not yet done, activate your virtual environment
