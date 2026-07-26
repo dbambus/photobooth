@@ -20,6 +20,7 @@
 import io
 import logging
 import os
+import time
 from datetime import datetime
 
 from PIL import Image
@@ -34,6 +35,12 @@ BACKUP_BASE_PATH = "~/Desktop/photobooth_backups"
 
 JPEG_SUFFIXES = (".jpg", ".jpeg")
 RAW_SUFFIXES = (".cr2", ".cr3", ".raw")
+
+# How long to wait for the JPEG to appear on the card before giving up and
+# developing the RAW instead, and how long a single wait for camera events
+# lasts in between.
+JPEG_WAIT_SECONDS = 3.0
+JPEG_POLL_MS = 150
 
 
 class CameraGphoto2(CameraInterface):
@@ -195,7 +202,34 @@ class CameraGphoto2(CameraInterface):
             return None
 
     def _findCapturedFiles(self, folder, base_name):
-        """Return (jpeg_name, raw_name) written for a single shutter release."""
+        """Return (jpeg_name, raw_name) written for a single shutter release.
+
+        When the camera writes RAW and JPEG, capture() regularly returns
+        before the JPEG is on the card, and the listing then shows only the
+        RAW. Waiting matters because the alternative is expensive: developing
+        the RAW takes several seconds and yields different colours than the
+        camera's own JPEG.
+
+        The wait has to happen through wait_for_event, not sleep. libgphoto2
+        caches directory listings and only refreshes them while processing
+        camera events - simply sleeping and listing again returns the very
+        same stale listing.
+        """
+        deadline = time.monotonic() + JPEG_WAIT_SECONDS
+
+        while True:
+            jpeg_name, raw_name = self._listCapturedFiles(folder, base_name)
+
+            if jpeg_name is not None or time.monotonic() >= deadline:
+                return jpeg_name, raw_name
+
+            try:
+                self._cap.wait_for_event(JPEG_POLL_MS, self._ctxt)
+            except gp.GPhoto2Error as e:
+                logging.warning("Waiting for camera events failed: {}".format(e))
+                return jpeg_name, raw_name
+
+    def _listCapturedFiles(self, folder, base_name):
         jpeg_name = None
         raw_name = None
 
