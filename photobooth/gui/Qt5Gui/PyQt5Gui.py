@@ -121,8 +121,52 @@ class PyQt5Gui(GuiSkeleton):
     def _disableTrigger(self):
         self._is_trigger = False
 
-    def _setWidget(self, widget):
+    # Duration of the cross fade between screens
+    FADE_MS = 220
+    # Duration of the shutter flash
+    FLASH_MS = 170
+
+    def _setWidget(self, widget, fade=True):
+        if not fade or self._gui.centralWidget() is None:
+            self._gui.setCentralWidget(widget)
+            return
+
+        effect = QtWidgets.QGraphicsOpacityEffect(widget)
+        widget.setGraphicsEffect(effect)
+
         self._gui.setCentralWidget(widget)
+
+        anim = QtCore.QPropertyAnimation(effect, b"opacity", widget)
+        anim.setDuration(self.FADE_MS)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
+        # Drop the effect once it has served its purpose: it would otherwise
+        # route every later repaint through an offscreen buffer, which is
+        # wasted work on screens that redraw continuously.
+        anim.finished.connect(lambda: widget.setGraphicsEffect(None))
+        anim.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
+
+    def _flash(self):
+        """Brief white flash, echoing the camera's shutter."""
+        overlay = QtWidgets.QWidget(self._gui)
+        overlay.setObjectName("FlashOverlay")
+        overlay.setStyleSheet("background-color: #ffffff;")
+        overlay.setGeometry(self._gui.rect())
+        overlay.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+
+        effect = QtWidgets.QGraphicsOpacityEffect(overlay)
+        overlay.setGraphicsEffect(effect)
+        overlay.show()
+        overlay.raise_()
+
+        anim = QtCore.QPropertyAnimation(effect, b"opacity", overlay)
+        anim.setDuration(self.FLASH_MS)
+        anim.setStartValue(0.85)
+        anim.setEndValue(0.0)
+        anim.setEasingCurve(QtCore.QEasingCurve.OutQuad)
+        anim.finished.connect(overlay.deleteLater)
+        anim.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
 
     def close(self):
         if self._gui.close():
@@ -247,7 +291,10 @@ class PyQt5Gui(GuiSkeleton):
                 countdown_time,
                 lambda: self._comm.send(Workers.MASTER, GuiEvent("capture")),
                 self._audio,
-            )
+            ),
+            # Follows straight after the button press, so it has to feel
+            # immediate - and the countdown repaints constantly anyway.
+            fade=False,
         )
 
     def updateCountdown(self, event):
@@ -314,8 +361,10 @@ class PyQt5Gui(GuiSkeleton):
                 skip,
                 state.gif,
                 self.expectedCaptureDuration()
-            )
+            ),
+            fade=False,
         )
+        self._flash()
 
     def showAssemble(self, state):
         self.noteCaptureFinished()

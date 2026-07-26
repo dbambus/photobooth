@@ -98,6 +98,26 @@ class IdleMessage(QtWidgets.QFrame):
             lay.addWidget(btn_boomerang)
         self.setLayout(lay)
 
+        # Keep a reference, otherwise the animation is collected right away.
+        self._pulse = self._startPulse(btn)
+
+    @staticmethod
+    def _startPulse(widget):
+        """Let the widget breathe slowly, so the idle screen does not look
+        frozen from across the room."""
+        effect = QtWidgets.QGraphicsOpacityEffect(widget)
+        widget.setGraphicsEffect(effect)
+
+        anim = QtCore.QPropertyAnimation(effect, b"opacity", widget)
+        anim.setDuration(2400)
+        anim.setStartValue(1.0)
+        anim.setKeyValueAt(0.5, 0.72)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QtCore.QEasingCurve.InOutSine)
+        anim.setLoopCount(-1)
+        anim.start()
+        return anim
+
 
 class GreeterMessage(QtWidgets.QFrame):
     def __init__(self, num_x, num_y, skip, countdown_action, boomerang=None):
@@ -338,7 +358,10 @@ class CountdownMessage(QtWidgets.QFrame):
         super().__init__()
         self.setObjectName("CountdownMessage")
 
-        self._step_size = 50
+        # Redraw interval of the countdown ring. 50 ms was visibly stepped;
+        # 25 ms doubles the rate without chasing the preview, which arrives
+        # at around 34 frames per second anyway.
+        self._step_size = 25
         self._value = time * (1000 // self._step_size)
         self._bar_value_old_int = self._value / (1000 // self._step_size)
         self._action = action
