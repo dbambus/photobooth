@@ -21,62 +21,47 @@ from .. import StateMachine
 
 
 class GuiSkeleton:
-
     def __init__(self, communicator):
-
         super().__init__()
         self._comm = communicator
 
     def showError(self, state):
-
         raise NotImplementedError()
 
     def showWelcome(self, state):
-
         raise NotImplementedError()
 
     def showStartup(self, state):
-
         raise NotImplementedError()
 
     def showSettings(self, state):
-
         raise NotImplementedError()
 
     def showIdle(self, state):
-
         raise NotImplementedError()
 
     def showGreeter(self, state):
-
         raise NotImplementedError()
 
     def showCountdown(self, state):
-
         raise NotImplementedError()
 
     def showCapture(self, state):
-
         raise NotImplementedError()
 
     def showAssemble(self, state):
-
         raise NotImplementedError()
 
     def showReview(self, state):
-
         raise NotImplementedError()
 
     def showPostprocess(self, state):
-
         raise NotImplementedError()
 
     def teardown(self, state):
-
         raise NotImplementedError()
 
     def handleState(self, state):
-
         if isinstance(state, StateMachine.CameraEvent):
             self.updateCountdown(state)
         elif isinstance(state, StateMachine.ErrorState):

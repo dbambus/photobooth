@@ -26,9 +26,7 @@ from .CameraInterface import CameraInterface
 
 
 class CameraDummy(CameraInterface):
-
     def __init__(self):
-
         super().__init__()
 
         self.hasPreview = True
@@ -37,15 +35,12 @@ class CameraDummy(CameraInterface):
 
         self._hue = 0
 
-        logging.info('Using CameraDummy')
+        logging.info("Using CameraDummy")
 
     def getPreview(self):
-
         return self.getPicture()
 
     def getPicture(self):
-
         self._hue = (self._hue + 1) % 360
-        r, g, b = hsv_to_rgb(self._hue / 360, .2, .9)
-        return Image.new('RGB', self._size, (int(r * 255), int(g * 255),
-                                             int(b * 255)))
+        r, g, b = hsv_to_rgb(self._hue / 360, 0.2, 0.9)
+        return Image.new("RGB", self._size, (int(r * 255), int(g * 255), int(b * 255)))

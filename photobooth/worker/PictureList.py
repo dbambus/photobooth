@@ -36,16 +36,15 @@ class PictureList:
 
         # Set basename and suffix
         self._basename = basename
-        self.suffix = '.jpg'
+        self.suffix = ".jpg"
         self.count_width = 5
 
         self.findExistingFiles()
 
     def findExistingFiles(self):
-        """Count number of existing files matchin the given basename
-        """
+        """Count number of existing files matchin the given basename"""
         # Find existing files
-        count_pattern = '[0-9]' * self.count_width
+        count_pattern = "[0-9]" * self.count_width
         pictures = glob(self.basename + count_pattern + self.suffix)
 
         # Get number of latest file
@@ -54,13 +53,15 @@ class PictureList:
         else:
             pictures.sort()
             last_picture = pictures[-1]
-            self.counter = int(last_picture[
-                -(self.count_width + len(self.suffix)):-len(self.suffix)])
+            self.counter = int(
+                last_picture[-(self.count_width + len(self.suffix)) : -len(self.suffix)]
+            )
 
         # Print initial infos
-        logging.info('Number of last existing file: %d', self.counter)
-        logging.info('Saving pictures as "%s%s.%s"', self.basename,
-                     self.count_width * 'X', 'jpg')
+        logging.info("Number of last existing file: %d", self.counter)
+        logging.info(
+            'Saving pictures as "%s%s.%s"', self.basename, self.count_width * "X", "jpg"
+        )
 
     @property
     def basename(self):

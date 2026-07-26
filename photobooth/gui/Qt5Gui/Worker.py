@@ -23,27 +23,21 @@ from PyQt5 import QtCore
 
 
 class Worker(QtCore.QThread):
-
     def __init__(self, comm):
-
         super().__init__()
         self._comm = comm
         self._queue = queue.Queue()
 
     def put(self, task):
-
         self._queue.put(task)
 
     def get(self):
-
         return self._queue.get()
 
     def done(self):
-
         self._queue.task_done()
 
     def run(self):
-
         while True:
             task = self.get()
             if task is None:

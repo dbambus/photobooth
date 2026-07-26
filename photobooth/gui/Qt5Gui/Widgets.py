@@ -30,7 +30,6 @@ class SpinningWaitClock(QtWidgets.QWidget):
     # https://wiki.python.org/moin/PyQt/A%20full%20widget%20waiting%20indicator
 
     def __init__(self):
-
         super().__init__()
 
         self._num_dots = 8
@@ -38,26 +37,21 @@ class SpinningWaitClock(QtWidgets.QWidget):
 
     @property
     def value(self):
-
         return self._value
 
     @value.setter
     def value(self, value):
-
         if self._value != value:
             self._value = value
             self.update()
 
     def showEvent(self, event):
-
         self.startTimer(100)
 
     def timerEvent(self, event):
-
         self.value += 1
 
     def paintEvent(self, event):
-
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
@@ -68,14 +62,15 @@ class SpinningWaitClock(QtWidgets.QWidget):
 
         for dot in range(dots):
             distance = (pos - dot) % dots
-            offset = (180 / dots * math.cos(2 * math.pi * dot / dots) - 20,
-                      180 / dots * math.sin(2 * math.pi * dot / dots) - 20)
+            offset = (
+                180 / dots * math.cos(2 * math.pi * dot / dots) - 20,
+                180 / dots * math.sin(2 * math.pi * dot / dots) - 20,
+            )
 
             color = (distance + 1) / (dots + 1) * 255
             painter.setBrush(QtGui.QBrush(QtGui.QColor(color, color, color)))
 
-            painter.drawEllipse(center[0] + offset[0], center[1] + offset[1],
-                                15, 15)
+            painter.drawEllipse(center[0] + offset[0], center[1] + offset[1], 15, 15)
 
         painter.end()
 
@@ -87,7 +82,6 @@ class RoundProgressBar(QtWidgets.QWidget):
     # https://stackoverflow.com/a/33583019
 
     def __init__(self, begin, end, value):
-
         super().__init__()
 
         self._begin = begin
@@ -100,12 +94,10 @@ class RoundProgressBar(QtWidgets.QWidget):
 
     @property
     def value(self):
-
         return self._value
 
     @value.setter
     def value(self, value):
-
         if self._value != value:
             if value < self._begin:
                 self._value = self._begin
@@ -115,39 +107,45 @@ class RoundProgressBar(QtWidgets.QWidget):
                 self._value = value
 
     def _drawBase(self, painter, base_rect):
-
         color = self.palette().base().color()
         color.setAlpha(100)
         brush = self.palette().base()
         brush.setColor(color)
-        painter.setPen(QtGui.QPen(self.palette().base().color(),
-                                  self._outline_pen_width))
+        painter.setPen(
+            QtGui.QPen(self.palette().base().color(), self._outline_pen_width)
+        )
         painter.setBrush(brush)
 
-        painter.drawEllipse(base_rect.adjusted(self._outline_pen_width // 2,
-                                               self._outline_pen_width // 2,
-                                               -self._outline_pen_width // 2,
-                                               -self._outline_pen_width // 2))
+        painter.drawEllipse(
+            base_rect.adjusted(
+                self._outline_pen_width // 2,
+                self._outline_pen_width // 2,
+                -self._outline_pen_width // 2,
+                -self._outline_pen_width // 2,
+            )
+        )
 
     def _drawCircle(self, painter, base_rect):
-
         if self.value == self._begin:
             return
 
         arc_length = 360 / (self._end - self._begin) * self.value
 
-        painter.setPen(QtGui.QPen(self.palette().text().color(),
-                                  self._data_pen_width))
+        painter.setPen(QtGui.QPen(self.palette().text().color(), self._data_pen_width))
         painter.setBrush(Qt.Qt.NoBrush)
-        painter.drawArc(base_rect.adjusted(self._outline_pen_width // 2,
-                                           self._outline_pen_width // 2,
-                                           -self._outline_pen_width // 2,
-                                           -self._outline_pen_width // 2),
-                        self._null_position * 16, -arc_length * 16)
+        painter.drawArc(
+            base_rect.adjusted(
+                self._outline_pen_width // 2,
+                self._outline_pen_width // 2,
+                -self._outline_pen_width // 2,
+                -self._outline_pen_width // 2,
+            ),
+            self._null_position * 16,
+            -arc_length * 16,
+        )
 
     def _drawText(self, painter, inner_rect, inner_radius):
-
-        text = '{}'.format(math.ceil(self.value))
+        text = "{}".format(math.ceil(self.value))
 
         f = self.font()
         f.setPixelSize(inner_radius * 0.8 / len(text))
@@ -157,7 +155,6 @@ class RoundProgressBar(QtWidgets.QWidget):
         painter.drawText(inner_rect, Qt.Qt.AlignCenter, text)
 
     def paintEvent(self, event):
-
         outer_radius = min(self.width(), self.height())
         inner_radius = outer_radius - self._outline_pen_width
         delta = (outer_radius - inner_radius) / 2
@@ -181,11 +178,9 @@ class RoundProgressBar(QtWidgets.QWidget):
 
 
 class TransparentOverlay(QtWidgets.QWidget):
-
     def __init__(self, parent, timeout=None, timeout_handle=None):
-
         super().__init__(parent)
-        self.setObjectName('TransparentOverlay')
+        self.setObjectName("TransparentOverlay")
 
         rect = parent.rect()
         rect.adjust(50, 50, -50, -50)
@@ -198,15 +193,12 @@ class TransparentOverlay(QtWidgets.QWidget):
         self.show()
 
     def paintEvent(self, event):
-
         opt = QtWidgets.QStyleOption()
         opt.initFrom(self)
         painter = QtGui.QPainter(self)
-        self.style().drawPrimitive(QtWidgets.QStyle.PE_Widget, opt, painter,
-                                   self)
+        self.style().drawPrimitive(QtWidgets.QStyle.PE_Widget, opt, painter, self)
         painter.end()
 
     def timerEvent(self, event):
-
         self.killTimer(self._timer)
         self._handle()

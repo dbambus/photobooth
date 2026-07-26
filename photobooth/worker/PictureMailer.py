@@ -31,8 +31,20 @@ from pathlib import Path
 from .WorkerTask import WorkerTask
 
 
-def send_mail(send_from, send_to, subject, message, picture, filename,
-              server, port, is_auth, username, password, is_tls):
+def send_mail(
+    send_from,
+    send_to,
+    subject,
+    message,
+    picture,
+    filename,
+    server,
+    port,
+    is_auth,
+    username,
+    password,
+    is_tls,
+):
     """Compose and send email with provided info and attachments.
 
     Based on https://stackoverflow.com/a/16509278
@@ -52,18 +64,17 @@ def send_mail(send_from, send_to, subject, message, picture, filename,
         is_tls (bool): use TLS mode
     """
     msg = MIMEMultipart()
-    msg['From'] = send_from
-    msg['To'] = send_to
-    msg['Date'] = formatdate(localtime=True)
-    msg['Subject'] = subject
+    msg["From"] = send_from
+    msg["To"] = send_to
+    msg["Date"] = formatdate(localtime=True)
+    msg["Subject"] = subject
 
     msg.attach(MIMEText(message))
 
-    part = MIMEBase('application', "octet-stream")
+    part = MIMEBase("application", "octet-stream")
     part.set_payload(picture.getbuffer())
     encoders.encode_base64(part)
-    part.add_header('Content-Disposition',
-                    'attachment; filename="{}"'.format(filename))
+    part.add_header("Content-Disposition", 'attachment; filename="{}"'.format(filename))
     msg.attach(part)
 
     smtp = smtplib.SMTP(server, port)
@@ -76,26 +87,34 @@ def send_mail(send_from, send_to, subject, message, picture, filename,
 
 
 class PictureMailer(WorkerTask):
-
     def __init__(self, config):
-
         super().__init__()
 
-        self._sender = config.get('Mailer', 'sender')
-        self._recipient = config.get('Mailer', 'recipient')
-        self._subject = config.get('Mailer', 'subject')
-        self._message = config.get('Mailer', 'message')
+        self._sender = config.get("Mailer", "sender")
+        self._recipient = config.get("Mailer", "recipient")
+        self._subject = config.get("Mailer", "subject")
+        self._message = config.get("Mailer", "message")
 
-        self._server = config.get('Mailer', 'server')
-        self._port = config.getInt('Mailer', 'port')
-        self._is_auth = config.getBool('Mailer', 'use_auth')
-        self._user = config.get('Mailer', 'user')
-        self._password = config.get('Mailer', 'password')
-        self._is_tls = config.getBool('Mailer', 'use_tls')
+        self._server = config.get("Mailer", "server")
+        self._port = config.getInt("Mailer", "port")
+        self._is_auth = config.getBool("Mailer", "use_auth")
+        self._user = config.get("Mailer", "user")
+        self._password = config.get("Mailer", "password")
+        self._is_tls = config.getBool("Mailer", "use_tls")
 
     def do(self, picture, filename):
-
-        logging.info('Sending picture to %s', self._recipient)
-        send_mail(self._sender, self._recipient, self._subject, self._message,
-                  picture, Path(filename).name, self._server, self._port,
-                  self._is_auth, self._user, self._password, self._is_tls)
+        logging.info("Sending picture to %s", self._recipient)
+        send_mail(
+            self._sender,
+            self._recipient,
+            self._subject,
+            self._message,
+            picture,
+            Path(filename).name,
+            self._server,
+            self._port,
+            self._is_auth,
+            self._user,
+            self._password,
+            self._is_tls,
+        )

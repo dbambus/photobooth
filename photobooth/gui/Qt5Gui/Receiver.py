@@ -23,19 +23,15 @@ from ...Threading import Workers
 
 
 class Receiver(QtCore.QThread):
-
     notify = QtCore.pyqtSignal(object)
 
     def __init__(self, comm):
-
         super().__init__()
         self._comm = comm
 
     def handle(self, state):
-
         self.notify.emit(state)
 
     def run(self):
-
         for state in self._comm.iter(Workers.GUI):
             self.handle(state)
