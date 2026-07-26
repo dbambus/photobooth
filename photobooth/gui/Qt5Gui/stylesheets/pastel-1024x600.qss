@@ -8,7 +8,7 @@ QWidget {
 }
 
 QMainWindow {
-    background-image: url(photobooth/gui/Qt5Gui/images/white.png);
+    background-color: #ffffff;
     color: #ffffff;
 }
 
@@ -69,7 +69,7 @@ QFrame#GreeterMessage QLabel#title {
 }
 
 QFrame#GreeterMessage QPushButton#button {
-    background-image: url(photobooth/gui/Qt5Gui/images/white.png);
+    background-color: #ffffff;
     border: none;
     font-size: 100px;
     margin-top: 0px;
@@ -98,8 +98,7 @@ QFrame#CountdownMessage {
 /* Pose Screen */
 
 QFrame#PoseMessage {
-    background-image: url(photobooth/gui/Qt5Gui/images/white.png);
-    background-repeat: no-repeat;
+    background-color: #ffffff;
     padding: 0px;
 }
 
@@ -122,14 +121,14 @@ QFrame#WaitMessage QLabel {
 /* Picture Screen */
 
 QFrame#PictureMessage {
-	background-image: url(photobooth/gui/Qt5Gui/images/white.png);
+	background-color: #ffffff;
     margin: 0px;
 }
 
 /* Overlay message */
 
 QWidget#TransparentOverlay {
-    background-image: url(photobooth/gui/Qt5Gui/images/white.png);
+    background-color: #ffffff;
     border-style: outset;
     border-width: 1px;
     border-radius: 0px;
@@ -139,7 +138,7 @@ QWidget#TransparentOverlay {
 /* Postprocess message */
 
 QWidget#PostprocessMessage QLabel {
-	background-image: url(photobooth/gui/Qt5Gui/images/white.png);
+	background-color: #ffffff;
     color: #49a300;
     font-size: 90px;
     qproperty-alignment: AlignCenter;
@@ -176,7 +175,7 @@ QTabWidget::tab-bar {
 }
 
 QTabBar::tab {
-    background-image: url(photobooth/gui/Qt5Gui/images/white.png);
+    background-color: #ffffff;
     border-style: outset;
     border-width: 2px;
     border-top-left-radius: 15px;
@@ -190,7 +189,7 @@ QTabBar::tab:selected {
 }
 
 QGroupBox {
-    background-image: url(photobooth/gui/Qt5Gui/images/white.png);
+    background-color: #ffffff;
     border-style: outset;
     border-width: 1px;
     border-radius: 15px;
