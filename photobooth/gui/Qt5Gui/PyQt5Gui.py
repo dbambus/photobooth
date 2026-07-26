@@ -20,6 +20,7 @@
 import logging
 import os
 import io
+import time
 
 from qtpy import QtCore
 from qtpy import QtGui
@@ -63,6 +64,11 @@ class PyQt5Gui(GuiSkeleton):
 
         self._is_gif_enabled = self._cfg.getBool("GIF", "enable")
         self._audio = AudioHelper(self._cfg)
+
+        # Measured durations of the last few shots, used to size the progress
+        # bar shown while waiting for the camera.
+        self._capture_durations = []
+        self._capture_started = None
 
     def run(self):
         exit_code = self._app.exec_()
@@ -233,6 +239,8 @@ class PyQt5Gui(GuiSkeleton):
         )
 
     def showCountdown(self, state):
+        # Reached again after a shot when further pictures follow.
+        self.noteCaptureFinished()
         countdown_time = self._cfg.getInt("Photobooth", "countdown_time")
         self._setWidget(
             Frames.CountdownMessage(
@@ -262,6 +270,32 @@ class PyQt5Gui(GuiSkeleton):
 #        self._gui.centralWidget().picture = ImageQt.imageQt(picture)
 #       self._gui.centralWidget().update()
 
+    # Assumed duration of a shot until the first one has been measured.
+    DEFAULT_CAPTURE_SECONDS = 2.5
+    # Number of recent shots the average is taken over.
+    CAPTURE_HISTORY = 5
+
+    def expectedCaptureDuration(self):
+        if not self._capture_durations:
+            return self.DEFAULT_CAPTURE_SECONDS
+
+        return sum(self._capture_durations) / len(self._capture_durations)
+
+    def noteCaptureFinished(self):
+        """Record how long the camera actually took."""
+        if self._capture_started is None:
+            return
+
+        self._capture_durations.append(time.monotonic() - self._capture_started)
+        del self._capture_durations[: -self.CAPTURE_HISTORY]
+        self._capture_started = None
+
+        logging.debug(
+            "Capture took {:.2f}s, expecting {:.2f}s next time".format(
+                self._capture_durations[-1], self.expectedCaptureDuration()
+            )
+        )
+
     def showCapture(self, state):
         num_pic = (
             self._cfg.getInt("Picture", "num_x"),
@@ -272,11 +306,19 @@ class PyQt5Gui(GuiSkeleton):
             for i in self._cfg.getIntList("Picture", "skip")
             if 1 <= i and i <= num_pic[0] * num_pic[1]
         ]
+        self._capture_started = time.monotonic()
         self._setWidget(
-            Frames.CaptureMessage(state.num_picture, *num_pic, skip, state.gif)
+            Frames.CaptureMessage(
+                state.num_picture,
+                *num_pic,
+                skip,
+                state.gif,
+                self.expectedCaptureDuration()
+            )
         )
 
     def showAssemble(self, state):
+        self.noteCaptureFinished()
         self._setWidget(Frames.WaitMessage(_("Processing picture...")))
 
     def _pil_to_qimage(self, path):

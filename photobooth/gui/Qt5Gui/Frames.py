@@ -134,7 +134,15 @@ class GreeterMessage(QtWidgets.QFrame):
 
 
 class CaptureMessage(QtWidgets.QFrame):
-    def __init__(self, num_picture, num_x, num_y, skip, boomerang=None):
+    # Redraw interval of the progress bar in milliseconds
+    _TICK_MS = 40
+    # Geometry of the bar: height, margin to the frame's edges
+    _BAR_HEIGHT = 10
+    _BAR_MARGIN = 80
+
+    def __init__(
+        self, num_picture, num_x, num_y, skip, boomerang=None, expected_duration=0
+    ):
         super().__init__()
         self.setObjectName("PoseMessage")
 
@@ -146,6 +154,12 @@ class CaptureMessage(QtWidgets.QFrame):
         else:
             self._text = _("Taking a photo...")
 
+        # How long the camera is expected to take. Drives the progress bar;
+        # zero hides it.
+        self._expected = expected_duration
+        self._elapsed = 0
+        self._timer = None
+
         self.initFrame()
 
     def initFrame(self):
@@ -153,6 +167,69 @@ class CaptureMessage(QtWidgets.QFrame):
         lay = QtWidgets.QVBoxLayout()
         lay.addWidget(lbl)
         self.setLayout(lay)
+
+    def showEvent(self, event):
+        if self._expected > 0:
+            self._timer = self.startTimer(self._TICK_MS)
+
+    def hideEvent(self, event):
+        if self._timer is not None:
+            self.killTimer(self._timer)
+            self._timer = None
+
+    def timerEvent(self, event):
+        self._elapsed += self._TICK_MS / 1000
+        self.update()
+
+    @property
+    def progress(self):
+        """Progress between 0 and 1.
+
+        Runs linearly to 92% over the expected duration and only creeps
+        along afterwards, approaching but never reaching 1. A bar sitting
+        at "finished" while the picture is still pending would be worse
+        than one that is merely slow.
+        """
+        if self._expected <= 0:
+            return 0
+
+        share = self._elapsed / self._expected
+        if share < 1:
+            return 0.92 * share
+
+        overrun = share - 1
+        return 0.92 + 0.08 * (overrun / (overrun + 1))
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        if self._expected <= 0:
+            return
+
+        width = self.width() - 2 * self._BAR_MARGIN
+        if width <= 0:
+            return
+
+        top = self.height() - self._BAR_MARGIN - self._BAR_HEIGHT
+        radius = self._BAR_HEIGHT // 2
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setPen(QtCore.Qt.NoPen)
+
+        painter.setBrush(QtGui.QColor("#eeeeee"))
+        painter.drawRoundedRect(
+            self._BAR_MARGIN, top, width, self._BAR_HEIGHT, radius, radius
+        )
+
+        done = int(width * self.progress)
+        if done > 0:
+            painter.setBrush(QtGui.QColor("#49a300"))
+            painter.drawRoundedRect(
+                self._BAR_MARGIN, top, done, self._BAR_HEIGHT, radius, radius
+            )
+
+        painter.end()
 
 
 class PictureMessage(QtWidgets.QFrame):
