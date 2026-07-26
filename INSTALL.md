@@ -54,11 +54,15 @@ You might be able to skip some packages if you plan on not using gphoto2.
 In a terminal, enter the following commands
 ```bash
 sudo apt install python3-dev python3-pip virtualenv
-sudo apt install qt5-default pyqt5-dev pyqt5-dev-tools # for PyQt5-GUI
-sudo apt install python3-pyqt5.qtmultimedia
+sudo apt install python3-pyqt6 python3-pyqt6.qtmultimedia # for the GUI
 sudo apt install gphoto2 libgphoto2-dev # to use gphoto2
 sudo apt install libcups2-dev # to use pycups
 ```
+
+On systems without PyQt6 packages (e.g. older Raspberry Pi OS releases), install
+`python3-pyqt5` and `python3-pyqt5.qtmultimedia` instead - the GUI code runs
+under either binding via [qtpy](https://github.com/spyder-ide/qtpy). Use the
+`pyqt5` extra below rather than `pyqt` in that case.
 
 If you want to use the gphoto2-cffi bindings you have to install the following packages:
 ```bash
@@ -136,7 +140,8 @@ pip install -e .[extras]
 ```
 and replace `extras` by a comma separated list (without whitespaces!) of the desired options.
 These include:
-- `pyqt` if you want to install PyQt5 from PIP (doesn't work on Raspbian)
+- `pyqt` if you want to install PyQt6 from PIP (doesn't work on Raspbian)
+- `pyqt5` for PyQt5 instead, on systems without PyQt6 wheels
 - `picamera` if you want to use the Raspberry Pi camera module
 - `gphoto2-cffi` if you want to use the `gphoto2-cffi` bindings
 - `raw` if your camera writes RAW files without an accompanying JPEG, so they

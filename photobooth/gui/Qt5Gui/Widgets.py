@@ -52,8 +52,8 @@ class SpinningWaitClock(QtWidgets.QWidget):
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        painter.setPen(QtGui.QPen(QtCore.Qt.PenStyle.NoPen))
 
         dots = self._num_dots
         center = (self.width() // 2, self.height() // 2)
@@ -162,7 +162,7 @@ class RoundProgressBar(QtWidgets.QWidget):
         inner_rect = QtCore.QRectF(delta, delta, inner_radius, inner_radius)
 
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
 
         # base circle
         self._drawBase(painter, base_rect)
@@ -195,7 +195,9 @@ class TransparentOverlay(QtWidgets.QWidget):
         opt = QtWidgets.QStyleOption()
         opt.initFrom(self)
         painter = QtGui.QPainter(self)
-        self.style().drawPrimitive(QtWidgets.QStyle.PE_Widget, opt, painter, self)
+        self.style().drawPrimitive(
+            QtWidgets.QStyle.PrimitiveElement.PE_Widget, opt, painter, self
+        )
         painter.end()
 
     def timerEvent(self, event):

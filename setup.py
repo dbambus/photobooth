@@ -186,7 +186,10 @@ setup(
     # Similar to `install_requires` above, these must be valid existing
     # projects.
     extras_require={  # Optional
-        "pyqt": ["PyQt5", "qtpy"],
+        "pyqt": ["PyQt6", "qtpy"],
+        # Fallback for systems without PyQt6 wheels, e.g. older Raspberry Pi
+        # OS releases. The GUI code targets both through qtpy.
+        "pyqt5": ["PyQt5", "qtpy"],
         "picamera": ["picamera"],
         "gphoto2-cffi": ["gphoto2-cffi"],
         # Only needed to develop a RAW file when the camera is configured to

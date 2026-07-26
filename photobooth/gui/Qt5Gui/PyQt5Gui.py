@@ -71,7 +71,7 @@ class PyQt5Gui(GuiSkeleton):
         self._capture_started = None
 
     def run(self):
-        exit_code = self._app.exec_()
+        exit_code = self._app.exec()
         self._gui = None
         return exit_code
 
@@ -94,9 +94,10 @@ class PyQt5Gui(GuiSkeleton):
             "photobooth/gui/Qt5Gui/fonts/AmaticSC-Regular.ttf",
             "photobooth/gui/Qt5Gui/fonts/AmaticSC-Bold.ttf",
         ]
-        self._fonts = QtGui.QFontDatabase()
+        # QFontDatabase's methods are static since Qt6; PyQt5 accepts the
+        # same call without instantiating the class.
         for font in fonts:
-            self._fonts.addApplicationFont(font)
+            QtGui.QFontDatabase.addApplicationFont(font)
 
     def _initReceiver(self):
         # Create receiver thread
@@ -140,7 +141,7 @@ class PyQt5Gui(GuiSkeleton):
         anim.setDuration(self.FADE_MS)
         anim.setStartValue(0.0)
         anim.setEndValue(1.0)
-        anim.setEasingCurve(QtCore.QEasingCurve.InOutQuad)
+        anim.setEasingCurve(QtCore.QEasingCurve.Type.InOutQuad)
         # Drop the effect once it has served its purpose: it would otherwise
         # route every later repaint through an offscreen buffer, which is
         # wasted work on screens that redraw continuously.
@@ -153,7 +154,7 @@ class PyQt5Gui(GuiSkeleton):
         overlay.setObjectName("FlashOverlay")
         overlay.setStyleSheet("background-color: #ffffff;")
         overlay.setGeometry(self._gui.rect())
-        overlay.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+        overlay.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents)
 
         effect = QtWidgets.QGraphicsOpacityEffect(overlay)
         overlay.setGraphicsEffect(effect)
@@ -164,7 +165,7 @@ class PyQt5Gui(GuiSkeleton):
         anim.setDuration(self.FLASH_MS)
         anim.setStartValue(0.85)
         anim.setEndValue(0.0)
-        anim.setEasingCurve(QtCore.QEasingCurve.OutQuad)
+        anim.setEasingCurve(QtCore.QEasingCurve.Type.OutQuad)
         anim.finished.connect(overlay.deleteLater)
         anim.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
 
@@ -192,11 +193,12 @@ class PyQt5Gui(GuiSkeleton):
             self._gui,
             state.origin,
             message,
-            QtWidgets.QMessageBox.Retry | QtWidgets.QMessageBox.Cancel,
-            QtWidgets.QMessageBox.Cancel,
+            QtWidgets.QMessageBox.StandardButton.Retry
+            | QtWidgets.QMessageBox.StandardButton.Cancel,
+            QtWidgets.QMessageBox.StandardButton.Cancel,
         )
 
-        if reply == QtWidgets.QMessageBox.Retry:
+        if reply == QtWidgets.QMessageBox.StandardButton.Retry:
             self._comm.send(Workers.MASTER, GuiEvent("retry"))
         else:
             self._comm.send(Workers.MASTER, GuiEvent("abort"))
@@ -236,7 +238,7 @@ class PyQt5Gui(GuiSkeleton):
         self._enableEscape()
         self._setWidget(Frames.WaitMessage(_("Starting the photobooth...")))
         if self._cfg.getBool("Gui", "hide_cursor"):
-            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.BlankCursor)
+            QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.BlankCursor)
 
     def showIdle(self, state):
         self._enableEscape()
@@ -438,11 +440,11 @@ class PyQt5Gui(GuiSkeleton):
         )
 
     def _handleKeypressEvent(self, event):
-        if self._is_escape and event.key() == QtCore.Qt.Key_Escape:
+        if self._is_escape and event.key() == QtCore.Qt.Key.Key_Escape:
             self._comm.send(Workers.MASTER, TeardownEvent(TeardownEvent.WELCOME))
-        elif self._is_trigger and event.key() == QtCore.Qt.Key_Space:
+        elif self._is_trigger and event.key() == QtCore.Qt.Key.Key_Space:
             self._comm.send(Workers.MASTER, GuiEvent("trigger"))
-        elif self._is_trigger and event.key() == QtCore.Qt.Key_B:
+        elif self._is_trigger and event.key() == QtCore.Qt.Key.Key_B:
             self._comm.send(Workers.MASTER, GuiEvent("triggerVideo"))
 
     def _showSetDateTime(self):
@@ -496,11 +498,12 @@ class PyQt5MainWindow(QtWidgets.QMainWindow):
             self,
             _("Confirmation"),
             _("Quit Photobooth?"),
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-            QtWidgets.QMessageBox.No,
+            QtWidgets.QMessageBox.StandardButton.Yes
+            | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No,
         )
 
-        if reply == QtWidgets.QMessageBox.Yes:
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
             e.accept()
         else:
             e.ignore()

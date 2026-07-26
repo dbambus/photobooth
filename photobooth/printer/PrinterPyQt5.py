@@ -29,12 +29,12 @@ class PrinterPyQt5(Printer):
     def __init__(self, page_size, num_prints, print_pdf=False):
         super().__init__(page_size, num_prints)
 
-        self._printer = QPrinter(QPrinter.HighResolution)
+        self._printer = QPrinter(QPrinter.PrinterMode.HighResolution)
         self._printer.setFullPage(True)
         self._printer.setPageSize(
-            QtGui.QPageSize(QtCore.QSizeF(*page_size), QtGui.QPageSize.Millimeter)
+            QtGui.QPageSize(QtCore.QSizeF(*page_size), QtGui.QPageSize.Unit.Millimeter)
         )
-        self._printer.setColorMode(QPrinter.Color)
+        self._printer.setColorMode(QPrinter.ColorMode.Color)
 
         logging.info('Using printer "%s"', self._printer.printerName())
 
@@ -42,7 +42,7 @@ class PrinterPyQt5(Printer):
         if self._print_pdf:
             logging.info("Using PDF printer")
             self._counter = 0
-            self._printer.setOutputFormat(QPrinter.PdfFormat)
+            self._printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
 
     def print(self, picture):
         for n in range(self.num_prints):

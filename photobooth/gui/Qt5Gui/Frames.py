@@ -113,7 +113,7 @@ class IdleMessage(QtWidgets.QFrame):
         anim.setStartValue(1.0)
         anim.setKeyValueAt(0.5, 0.72)
         anim.setEndValue(1.0)
-        anim.setEasingCurve(QtCore.QEasingCurve.InOutSine)
+        anim.setEasingCurve(QtCore.QEasingCurve.Type.InOutSine)
         anim.setLoopCount(-1)
         anim.start()
         return anim
@@ -234,8 +234,8 @@ class CaptureMessage(QtWidgets.QFrame):
         radius = self._BAR_HEIGHT // 2
 
         painter = QtGui.QPainter(self)
-        painter.setRenderHint(QtGui.QPainter.Antialiasing)
-        painter.setPen(QtCore.Qt.NoPen)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
 
         painter.setBrush(QtGui.QColor("#eeeeee"))
         painter.drawRoundedRect(
@@ -266,8 +266,8 @@ class PictureMessage(QtWidgets.QFrame):
             pix = QtGui.QPixmap(self._picture)
         pix = pix.scaled(
             self.contentsRect().size(),
-            QtCore.Qt.KeepAspectRatio,
-            QtCore.Qt.SmoothTransformation,
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+            QtCore.Qt.TransformationMode.SmoothTransformation,
         )
 
         origin = (
@@ -292,22 +292,22 @@ class GIFMessage(QtWidgets.QFrame):
     def initFrame(self, gif):
         # make sure that we are at start of stream and load into movie
         gif.seek(0)
-        self.a = QtCore.QByteArray.fromRawData(gif.getvalue())
+        self.a = QtCore.QByteArray(gif.getvalue())
         self.b = QtCore.QBuffer(self.a)
-        self.b.open(QtCore.QIODevice.ReadOnly)
+        self.b.open(QtCore.QIODevice.OpenModeFlag.ReadOnly)
         self.movie = QtGui.QMovie(self.b, b"gif", self)
 
         size = self.movie.scaledSize()
         self.setGeometry(200, 200, size.width(), size.height())
         self.movie_screen = QtWidgets.QLabel("GIF")
         self.movie_screen.setSizePolicy(
-            QtWidgets.QSizePolicy.MinimumExpanding,
-            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
         )
         lay = QtWidgets.QVBoxLayout()
         lay.addWidget(self.movie_screen)
         self.setLayout(lay)
-        self.movie.setCacheMode(QtGui.QMovie.CacheAll)
+        self.movie.setCacheMode(QtGui.QMovie.CacheMode.CacheAll)
         self.movie_screen.setMovie(self.movie)
         self.movie_screen.setScaledContents(False)
         logging.debug("Return value of movie.isValid: {}".format(self.movie.isValid()))
@@ -348,7 +348,7 @@ class WaitMessage(QtWidgets.QFrame):
             painter,
             QtCore.QPoint(*offset),
             self._clock.visibleRegion(),
-            QtWidgets.QWidget.DrawChildren,
+            QtWidgets.QWidget.RenderFlag.DrawChildren,
         )
         painter.end()
 
@@ -423,13 +423,13 @@ class CountdownMessage(QtWidgets.QFrame):
             # The preview keeps the camera's aspect ratio, which rarely
             # matches the screen. Fill the frame first so the bars beside the
             # image are black instead of showing the style's background.
-            painter.fillRect(self.rect(), QtCore.Qt.black)
+            painter.fillRect(self.rect(), QtCore.Qt.GlobalColor.black)
 
             pix = QtGui.QPixmap.fromImage(self.picture)
             pix = pix.scaled(
                 self.contentsRect().size(),
-                QtCore.Qt.KeepAspectRatio,
-                QtCore.Qt.FastTransformation,
+                QtCore.Qt.AspectRatioMode.KeepAspectRatio,
+                QtCore.Qt.TransformationMode.FastTransformation,
             )
             origin = (
                 (self.width() - pix.width()) // 2,
@@ -445,7 +445,7 @@ class CountdownMessage(QtWidgets.QFrame):
             painter,
             QtCore.QPoint(*offset),
             self._bar.visibleRegion(),
-            QtWidgets.QWidget.DrawChildren,
+            QtWidgets.QWidget.RenderFlag.DrawChildren,
         )
 
         painter.end()
@@ -965,7 +965,7 @@ class Settings(QtWidgets.QFrame):
                     self,
                     _("Select directory"),
                     os.path.expanduser("~"),
-                    QtWidgets.QFileDialog.ShowDirsOnly,
+                    QtWidgets.QFileDialog.Option.ShowDirsOnly,
                 )
             )
 
