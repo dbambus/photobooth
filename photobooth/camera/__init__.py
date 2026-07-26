@@ -65,6 +65,8 @@ class Camera:
             'with' if self._is_preview else 'without'))
 
         test_picture = self._cap.getPicture()
+        if test_picture is None:
+            raise RuntimeError('Camera did not return a test picture')
         if self._rotation is not None:
             test_picture = test_picture.transpose(self._rotation)
 
@@ -81,6 +83,7 @@ class Camera:
                                        (255, 255, 255))
 
         self.setIdle()
+        logging.info('Idle waiting for camera events')
         self._comm.send(Workers.MASTER, StateMachine.CameraEvent('ready'))
 
     def teardown(self, state):
@@ -129,21 +132,38 @@ class Camera:
         if self._is_preview:
             while self._comm.empty(Workers.CAMERA):
                 picture = self._cap.getPreview()
+                if picture is None:
+                    continue
+                picture = self._toImage(picture)
                 if self._rotation is not None:
                     picture = picture.transpose(self._rotation)
                 picture = picture.resize(self._pic_dims.previewSize)
                 picture = ImageOps.mirror(picture)
                 byte_data = BytesIO()
-                picture.save(byte_data, format='jpeg')
+                picture.save(byte_data, format='jpeg', quality=70)
                 self._comm.send(Workers.GUI,
                                 StateMachine.CameraEvent('preview', byte_data))
 
+    @staticmethod
+    def _toImage(picture):
+
+        # CameraGphoto2 hands out the raw JPEG bytes it received from the
+        # camera, the other modules return a PIL image directly.
+        if isinstance(picture, (bytes, bytearray)):
+            return Image.open(BytesIO(picture))
+
+        return picture
+
     def capturePicture(self, state):
+        logging.info('capturing picture {}'.format(state.num_picture + 1))
 
         self.setIdle()
         picture = self._cap.getPicture()
+        if picture is None:
+            raise RuntimeError('Camera did not return a picture')
         if self._rotation is not None:
             picture = picture.transpose(self._rotation)
+        logging.info('Got picture with size: {}'.format(picture.size))
         byte_data = BytesIO()
         picture.save(byte_data, format='jpeg')
         self._pictures.append(byte_data)

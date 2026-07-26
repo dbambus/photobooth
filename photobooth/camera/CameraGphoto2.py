@@ -19,12 +19,21 @@
 
 import io
 import logging
+import os
+from datetime import datetime
 
 from PIL import Image
 
 import gphoto2 as gp
 
 from .CameraInterface import CameraInterface
+
+# Directory the captured JPEGs are backed up to. RAW files are left on the
+# camera's card on purpose, so the card doubles as the RAW archive.
+BACKUP_BASE_PATH = "~/Desktop/photobooth_backups"
+
+JPEG_SUFFIXES = (".jpg", ".jpeg")
+RAW_SUFFIXES = (".cr2", ".cr3", ".raw")
 
 
 class CameraGphoto2(CameraInterface):
@@ -41,7 +50,10 @@ class CameraGphoto2(CameraInterface):
 
     def cleanup(self):
         self._changeConfig("Shutdown")
-        self._cap.exit(self._ctxt)
+        try:
+            self._cap.exit(self._ctxt)
+        except gp.GPhoto2Error as e:
+            logging.warning("Error during camera exit: {}".format(e))
 
     def _setupLogging(self):
         gp.error_severity[gp.GP_ERROR] = logging.ERROR
@@ -55,14 +67,14 @@ class CameraGphoto2(CameraInterface):
         logging.info("Camera summary: %s", str(self._cap.get_summary(self._ctxt)))
 
         # read model specific configuration
-        config = self._cap.get_config()
+        config = self._cap.get_config(self._ctxt)
         self.loadConfig(config.get_child_by_name("cameramodel").get_value())
 
         # set startup configuration
         self._changeConfig("Startup")
 
         #  print current config
-        self._printConfig(self._cap.get_config())
+        self._printConfig(self._cap.get_config(self._ctxt))
 
     @staticmethod
     def _configTreeToText(tree, indent=0):
@@ -99,7 +111,7 @@ class CameraGphoto2(CameraInterface):
 
     def _changeConfig(self, state):
         if self.config[state]:
-            config = self._cap.get_config()
+            config = self._cap.get_config(self._ctxt)
 
             for key in self.config[state]:
                 val = config.get_child_by_name(key)
@@ -107,29 +119,179 @@ class CameraGphoto2(CameraInterface):
                     val.set_value(self.config[state][key])
 
             try:
-                self._cap.set_config(config)
-            except BaseException as e:
-                logging.warn(
-                    (
-                        "CameraGphoto2: Applying config for state " '"{}" failed: {}'
-                    ).format(state, e)
+                self._cap.set_config(config, self._ctxt)
+            except Exception as e:
+                logging.warning(
+                    'CameraGphoto2: Applying config for state "{}" failed: {}'.format(
+                        state, e
+                    )
                 )
 
+    def _fileGet(self, folder, name, file_type):
+        """Download a file from the camera.
+
+        python-gphoto2 changed the signature of ``Camera.file_get`` between
+        releases: older builds return the ``CameraFile``, newer ones expect it
+        to be passed in. Support both so the same code runs on Debian's
+        packaged bindings and on a pip-installed version.
+        """
+        try:
+            camera_file = gp.CameraFile()
+            self._cap.file_get(folder, name, file_type, camera_file, self._ctxt)
+            return camera_file
+        except TypeError as e:
+            if "expected at most 4 arguments" not in str(e):
+                raise
+            return self._cap.file_get(folder, name, file_type, self._ctxt)
+
     def setActive(self):
+        config = self._cap.get_config(self._ctxt)
+        try:
+            # Force the viewfinder on, otherwise the EOS RP drops out of
+            # live view and the preview stalls.
+            config.get_child_by_name("viewfinder").set_value(1)
+
+            # Route the output to the PC so the camera's own screen does not
+            # compete with the USB connection.
+            config.get_child_by_name("output").set_value("PC")
+
+            self._cap.set_config(config, self._ctxt)
+        except (gp.GPhoto2Error, ValueError) as e:
+            logging.warning("Could not lock live view: {}".format(e))
+
         self._changeConfig("Active")
 
     def setIdle(self):
         self._changeConfig("Idle")
 
     def getPreview(self):
-        camera_file = self._cap.capture_preview()
-        file_data = camera_file.get_data_and_size()
+        try:
+            camera_file = gp.CameraFile()
+            self._cap.capture_preview(camera_file, self._ctxt)
+            file_data = camera_file.get_data_and_size()
+
+            # Return raw bytes. Passing those across the process boundary is
+            # safer than a PIL object backed by a gphoto2 file handle.
+            return bytes(file_data)
+        except gp.GPhoto2Error as e:
+            logging.warning("Preview capture failed: {}".format(e))
+            return None
+
+    def _findCapturedFiles(self, folder, base_name):
+        """Return (jpeg_name, raw_name) written for a single shutter release."""
+        jpeg_name = None
+        raw_name = None
+
+        file_list = self._cap.folder_list_files(folder, self._ctxt)
+
+        for i in range(gp.gp_list_count(file_list)):
+            ret, file_name = gp.gp_list_get_name(file_list, i)
+
+            if ret != gp.GP_OK:
+                logging.warning(
+                    "Failed to get filename at index {}: {}".format(
+                        i, gp.gp_result_as_string(ret)
+                    )
+                )
+                continue
+
+            if os.path.splitext(file_name)[0] != base_name:
+                continue
+
+            if file_name.lower().endswith(JPEG_SUFFIXES):
+                jpeg_name = file_name
+            elif file_name.lower().endswith(RAW_SUFFIXES):
+                raw_name = file_name
+
+            if jpeg_name and raw_name:
+                break
+
+        return jpeg_name, raw_name
+
+    def _backupPath(self, file_name):
+        backup_dir = os.path.join(
+            os.path.expanduser(BACKUP_BASE_PATH), datetime.now().strftime("%Y-%m-%d")
+        )
+        os.makedirs(backup_dir, exist_ok=True)
+        return os.path.join(backup_dir, file_name)
+
+    def _getJpeg(self, folder, file_name):
+        """Download the camera's JPEG and keep a copy on disk."""
+        logging.info("Downloading JPEG file: {}".format(file_name))
+
+        camera_file = self._fileGet(folder, file_name, gp.GP_FILE_TYPE_NORMAL)
+        file_data = bytes(camera_file.get_data_and_size())
+        logging.info("JPEG file data length: {}".format(len(file_data)))
+
+        try:
+            backup_path = self._backupPath(file_name)
+            with open(backup_path, "wb") as f:
+                f.write(file_data)
+            logging.info("Saved JPEG backup to: {}".format(backup_path))
+        except OSError as e:
+            # A failing backup must not cost us the picture.
+            logging.error("Could not write JPEG backup: {}".format(e))
+
         return Image.open(io.BytesIO(file_data))
 
+    def _getJpegFromRaw(self, folder, file_name):
+        """Fallback for cameras configured to write RAW only.
+
+        Not used in the normal RAW+JPEG setup, so ``rawpy`` is imported lazily
+        and stays an optional dependency.
+        """
+        logging.info("No JPEG on camera, converting RAW file: {}".format(file_name))
+
+        try:
+            import rawpy
+        except ImportError:
+            logging.error("rawpy is not installed, cannot convert RAW to JPEG")
+            return None
+
+        camera_file = self._fileGet(folder, file_name, gp.GP_FILE_TYPE_RAW)
+        file_data = bytes(camera_file.get_data_and_size())
+
+        with rawpy.imread(io.BytesIO(file_data)) as raw:
+            rgb = raw.postprocess(
+                use_camera_wb=True,
+                no_auto_bright=False,
+                output_bps=8,
+            )
+
+        logging.info("Converted RAW file {} to JPEG in memory".format(file_name))
+        return Image.fromarray(rgb)
+
     def getPicture(self):
-        file_path = self._cap.capture(gp.GP_CAPTURE_IMAGE)
-        camera_file = self._cap.file_get(
-            file_path.folder, file_path.name, gp.GP_FILE_TYPE_NORMAL
-        )
-        file_data = camera_file.get_data_and_size()
-        return Image.open(io.BytesIO(file_data))
+        try:
+            file_info = self._cap.capture(gp.GP_CAPTURE_IMAGE, self._ctxt)
+            logging.info(
+                "Captured file path: Folder='{}', Name='{}'".format(
+                    file_info.folder, file_info.name
+                )
+            )
+
+            base_name = os.path.splitext(file_info.name)[0]
+            jpeg_name, raw_name = self._findCapturedFiles(file_info.folder, base_name)
+
+            # The RAW file is deliberately left on the card and never
+            # downloaded when a JPEG is available - transferring ~25 MB per
+            # shot over USB would stall the photobooth.
+            if jpeg_name:
+                return self._getJpeg(file_info.folder, jpeg_name)
+
+            logging.warning(
+                "No JPEG file found on camera with base name '{}'".format(base_name)
+            )
+
+            if raw_name:
+                return self._getJpegFromRaw(file_info.folder, raw_name)
+
+            logging.error("Camera wrote neither a JPEG nor a RAW file")
+            return None
+
+        except gp.GPhoto2Error as e:
+            logging.error("GPhoto2 error during capture: {}".format(e))
+            return None
+        except Exception as e:
+            logging.error("Unexpected error during capture: {}".format(e))
+            return None

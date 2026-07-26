@@ -189,6 +189,9 @@ setup(
         "pyqt": ["PyQt5", "qtpy"],
         "picamera": ["picamera"],
         "gphoto2-cffi": ["gphoto2-cffi"],
+        # Only needed to develop a RAW file when the camera is configured to
+        # write RAW without an accompanying JPEG.
+        "raw": ["rawpy"],
         "dev": [
             "setuptools",
             "wheel",
