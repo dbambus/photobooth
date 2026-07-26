@@ -84,6 +84,14 @@ class CameraInterface:
     def getPicture(self):
         raise NotImplementedError()
 
+    def setCaptureRaw(self, enabled):
+        """Tell the camera whether to write a RAW file besides the JPEG.
+
+        Only meaningful for cameras whose file format can be set remotely,
+        so the default is to do nothing.
+        """
+        pass
+
     def _initConfig(self):
         self._cfg = configparser.ConfigParser(interpolation=None)
         filename = os.path.join(os.path.dirname(__file__), "models", "defaults.cfg")

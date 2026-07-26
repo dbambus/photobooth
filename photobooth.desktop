@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Photobooth
+Name[de]=Fotobox
+Comment=Start the photobooth
+Comment[de]=Fotobox starten
+# Adjust both paths if the photobooth lives somewhere else.
+Exec=/root/Desktop/photobooth/start-photobooth.sh
+Icon=/root/Desktop/photobooth/photobooth/gui/Qt5Gui/images/camera.svg
+Path=/root/Desktop/photobooth
+Terminal=false
+Categories=Graphics;Photography;
+StartupNotify=true

@@ -658,9 +658,20 @@ class Settings(QtWidgets.QFrame):
 
         self.add("Camera", "rotation", rotation)
 
+        capture_raw = QtWidgets.QCheckBox()
+        capture_raw.setChecked(self._cfg.getBool("Camera", "capture_raw"))
+        capture_raw.setToolTip(
+            _(
+                "The RAW file stays on the memory card, only the JPEG is "
+                "transferred. Switching this off speeds up every shot."
+            )
+        )
+        self.add("Camera", "capture_raw", capture_raw)
+
         layout = QtWidgets.QFormLayout()
         layout.addRow(_("Camera module:"), module)
         layout.addRow(_("Camera rotation:"), rotation)
+        layout.addRow(_("Keep RAW files on the camera:"), capture_raw)
 
         widget = QtWidgets.QWidget()
         widget.setLayout(layout)
@@ -1213,6 +1224,11 @@ class Settings(QtWidgets.QFrame):
             "Camera",
             "rotation",
             str(self.rot_vals_[self.get("Camera", "rotation").currentIndex()]),
+        )
+        self._cfg.set(
+            "Camera",
+            "capture_raw",
+            str(self.get("Camera", "capture_raw").isChecked()),
         )
 
         self._cfg.set("Picture", "num_x", self.get("Picture", "num_x").text())

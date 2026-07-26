@@ -64,6 +64,8 @@ class Camera:
         logging.info('Using camera {} preview functionality'.format(
             'with' if self._is_preview else 'without'))
 
+        self._cap.setCaptureRaw(self._cfg.getBool('Camera', 'capture_raw'))
+
         test_picture = self._cap.getPicture()
         if test_picture is None:
             raise RuntimeError('Camera did not return a test picture')

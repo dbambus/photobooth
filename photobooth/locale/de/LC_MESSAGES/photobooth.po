@@ -210,6 +210,18 @@ msgstr "Kamera Modul:"
 msgid "Camera rotation:"
 msgstr "Kameradrehung:"
 
+#: photobooth/gui/Qt5Gui/Frames.py:663
+msgid "Keep RAW files on the camera:"
+msgstr "RAW-Dateien auf der Kamera behalten:"
+
+#: photobooth/gui/Qt5Gui/Frames.py:665
+msgid ""
+"The RAW file stays on the memory card, only the JPEG is transferred. "
+"Switching this off speeds up every shot."
+msgstr ""
+"Die RAW-Datei bleibt auf der Speicherkarte, uebertragen wird nur das JPEG. "
+"Abschalten beschleunigt jede Aufnahme."
+
 #: photobooth/gui/Qt5Gui/Frames.py:741 photobooth/gui/Qt5Gui/Frames.py:747
 #: photobooth/gui/Qt5Gui/Frames.py:758 photobooth/gui/Qt5Gui/Frames.py:762
 #: photobooth/gui/Qt5Gui/Frames.py:965 photobooth/gui/Qt5Gui/Frames.py:973

@@ -164,6 +164,23 @@ class CameraGphoto2(CameraInterface):
     def setIdle(self):
         self._changeConfig("Idle")
 
+    def setCaptureRaw(self, enabled):
+        section = "Startup" if enabled else "StartupNoRaw"
+
+        if not self.config.has_section(section):
+            logging.warning(
+                'Camera config has no section "{}", keeping the file format '
+                "as it is".format(section)
+            )
+            return
+
+        logging.info(
+            "RAW capture {}, applying [{}]".format(
+                "enabled" if enabled else "disabled", section
+            )
+        )
+        self._changeConfig(section)
+
     def getPreview(self):
         try:
             camera_file = gp.CameraFile()
