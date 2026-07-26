@@ -18,11 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 # Provide installed photobooth version
-from pkg_resources import get_distribution, DistributionNotFound
+try:
+    from importlib.metadata import version, PackageNotFoundError
+except ImportError:
+    # Backport for very old Python versions (< 3.8)
+    from importlib_metadata import version, PackageNotFoundError
 
 try:
-    __version__ = get_distribution("photobooth").version
-except DistributionNotFound:
+    __version__ = version("photobooth")
+except PackageNotFoundError:
     __version__ = "unknown"
 
 import argparse

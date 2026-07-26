@@ -19,7 +19,7 @@
 
 import queue
 
-from PyQt5 import QtCore
+from qtpy import QtCore
 
 
 class Worker(QtCore.QThread):

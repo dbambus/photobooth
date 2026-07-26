@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from PyQt5 import QtCore
+from qtpy import QtCore
 
 from ...Threading import Workers
 
 
 class Receiver(QtCore.QThread):
-    notify = QtCore.pyqtSignal(object)
+    notify = QtCore.Signal(object)
 
     def __init__(self, comm):
         super().__init__()

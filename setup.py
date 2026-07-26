@@ -32,7 +32,7 @@ from os import path, listdir
 
 # To compile message catalogs
 from setuptools.command.sdist import sdist
-from distutils.command.build import build
+from setuptools.command.build import build
 
 here = path.abspath(path.dirname(__file__))
 
@@ -186,7 +186,7 @@ setup(
     # Similar to `install_requires` above, these must be valid existing
     # projects.
     extras_require={  # Optional
-        "pyqt": ["PyQt5"],
+        "pyqt": ["PyQt5", "qtpy"],
         "picamera": ["picamera"],
         "gphoto2-cffi": ["gphoto2-cffi"],
         "dev": [
@@ -194,9 +194,10 @@ setup(
             "wheel",
             "twine",
             "Babel",
+            "black",
         ],
     },
-    python_requires=">=3.5",
+    python_requires=">=3.9",
     # If there are data files included in your packages that need to be
     # installed, specify them here.
     #

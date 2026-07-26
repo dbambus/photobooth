@@ -19,10 +19,9 @@
 
 import math
 
-from PyQt5 import Qt
-from PyQt5 import QtCore
-from PyQt5 import QtGui
-from PyQt5 import QtWidgets
+from qtpy import QtCore
+from qtpy import QtGui
+from qtpy import QtWidgets
 
 
 class SpinningWaitClock(QtWidgets.QWidget):
@@ -57,17 +56,17 @@ class SpinningWaitClock(QtWidgets.QWidget):
         painter.setPen(QtGui.QPen(QtCore.Qt.NoPen))
 
         dots = self._num_dots
-        center = (self.width() / 2, self.height() / 2)
+        center = (self.width() // 2, self.height() // 2)
         pos = self.value % dots
 
         for dot in range(dots):
             distance = (pos - dot) % dots
             offset = (
-                180 / dots * math.cos(2 * math.pi * dot / dots) - 20,
-                180 / dots * math.sin(2 * math.pi * dot / dots) - 20,
+                int(180 / dots * math.cos(2 * math.pi * dot / dots) - 20),
+                int(180 / dots * math.sin(2 * math.pi * dot / dots) - 20),
             )
 
-            color = (distance + 1) / (dots + 1) * 255
+            color = int((distance + 1) / (dots + 1) * 255)
             painter.setBrush(QtGui.QBrush(QtGui.QColor(color, color, color)))
 
             painter.drawEllipse(center[0] + offset[0], center[1] + offset[1], 15, 15)
@@ -129,10 +128,10 @@ class RoundProgressBar(QtWidgets.QWidget):
         if self.value == self._begin:
             return
 
-        arc_length = 360 / (self._end - self._begin) * self.value
+        arc_length = int(360 / (self._end - self._begin) * self.value)
 
         painter.setPen(QtGui.QPen(self.palette().text().color(), self._data_pen_width))
-        painter.setBrush(Qt.Qt.NoBrush)
+        painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
         painter.drawArc(
             base_rect.adjusted(
                 self._outline_pen_width // 2,
@@ -148,11 +147,11 @@ class RoundProgressBar(QtWidgets.QWidget):
         text = "{}".format(math.ceil(self.value))
 
         f = self.font()
-        f.setPixelSize(inner_radius * 0.8 / len(text))
+        f.setPixelSize(int(inner_radius * 0.8 / len(text)))
         painter.setFont(f)
         painter.setPen(self.palette().text().color())
 
-        painter.drawText(inner_rect, Qt.Qt.AlignCenter, text)
+        painter.drawText(inner_rect, QtCore.Qt.AlignmentFlag.AlignCenter, text)
 
     def paintEvent(self, event):
         outer_radius = min(self.width(), self.height())
