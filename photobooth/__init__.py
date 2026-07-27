@@ -17,7 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import os
 import sys
+
+# Prefer PyQt6 over PyQt5 when both are installed - e.g. on a system where
+# PyQt5 is still around for other applications. qtpy reads QT_API at import
+# time, so this has to happen before any of our modules import it.
+# An explicit QT_API set by the operator always wins.
+if "QT_API" not in os.environ:
+    try:
+        import PyQt6  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        os.environ["QT_API"] = "pyqt6"
+
 from .main import main
 
 name = "photobooth"
