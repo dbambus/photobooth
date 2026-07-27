@@ -80,7 +80,14 @@ class PyQt5Gui(GuiSkeleton):
 
         # Load stylesheet
         style = self._cfg.get("Gui", "style")
-        filename = next((file for name, file in styles if name == style))
+        filename = next((file for name, file in styles if name == style), None)
+        if filename is None:
+            default_name, filename = styles[0]
+            logging.warning(
+                'Unknown style "{}" in config, falling back to "{}"'.format(
+                    style, default_name
+                )
+            )
         with open(os.path.join(os.path.dirname(__file__), filename), "r") as f:
             stylesheet = f.read()
 

@@ -173,7 +173,9 @@ setup(
         "opencv-python",
         "Pillow",
         "gpiozero",
-        "gphoto2",
+        # CameraGphoto2 relies on the Camera.file_get() signature introduced
+        # in 2.3.
+        "gphoto2>=2.3",
         "pycups",
         "requests",
     ],

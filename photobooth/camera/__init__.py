@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import time
 
 from PIL import Image, ImageOps
 from io import BytesIO
@@ -25,6 +26,9 @@ from io import BytesIO
 from .PictureDimensions import PictureDimensions
 from .. import StateMachine
 from ..Threading import Workers
+
+# Pause between a failed capture and the next automatic retry.
+RETRY_DELAY_SECONDS = 0.5
 
 # Available camera modules as tuples of (config name, module name, class name)
 modules = (
@@ -52,6 +56,8 @@ class Camera:
 
         self._is_preview = self._cfg.getBool('Photobooth', 'show_preview')
         self._is_keep_pictures = self._cfg.getBool('Storage', 'keep_pictures')
+        self._capture_error_retry = self._cfg.getInt(
+            'Photobooth', 'capture_error_retry')
 
         rot_vals = {0: None, 90: Image.ROTATE_90, 180: Image.ROTATE_180,
                     270: Image.ROTATE_270}
@@ -66,9 +72,7 @@ class Camera:
 
         self._cap.setCaptureRaw(self._cfg.getBool('Camera', 'capture_raw'))
 
-        test_picture = self._cap.getPicture()
-        if test_picture is None:
-            raise RuntimeError('Camera did not return a test picture')
+        test_picture = self._getPictureWithRetry('Startup')
         test_picture = self._toImage(test_picture)
         if self._rotation is not None:
             test_picture = test_picture.transpose(self._rotation)
@@ -157,13 +161,44 @@ class Camera:
 
         return picture
 
+    def _getPictureWithRetry(self, context):
+        """Fetch a picture from the camera, retrying on failure.
+
+        A transient hiccup (a dropped USB frame, a slow write to the card)
+        should not immediately drop into the manual-retry error dialog.
+        [Photobooth] capture_error_retry controls how many extra attempts
+        are made before giving up and raising, which is what still triggers
+        that dialog.
+        """
+        attempts = self._capture_error_retry + 1
+
+        for attempt in range(1, attempts + 1):
+            try:
+                picture = self._cap.getPicture()
+            except Exception as e:
+                picture = None
+                logging.warning(
+                    '{}: attempt {}/{} raised an exception: {}'.format(
+                        context, attempt, attempts, e))
+
+            if picture is not None:
+                return picture
+
+            if attempt < attempts:
+                logging.warning(
+                    '{}: attempt {}/{} returned no picture, retrying'.format(
+                        context, attempt, attempts))
+                time.sleep(RETRY_DELAY_SECONDS)
+
+        raise RuntimeError(
+            '{}: camera did not return a picture after {} attempt(s)'.format(
+                context, attempts))
+
     def capturePicture(self, state):
         logging.info('capturing picture {}'.format(state.num_picture + 1))
 
         self.setIdle()
-        picture = self._cap.getPicture()
-        if picture is None:
-            raise RuntimeError('Camera did not return a picture')
+        picture = self._getPictureWithRetry('Capture')
 
         if isinstance(picture, (bytes, bytearray)) and self._rotation is None:
             # The camera already handed us a JPEG and nothing has to be

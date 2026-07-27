@@ -137,19 +137,12 @@ class CameraGphoto2(CameraInterface):
     def _fileGet(self, folder, name, file_type):
         """Download a file from the camera.
 
-        python-gphoto2 changed the signature of ``Camera.file_get`` between
-        releases: older builds return the ``CameraFile``, newer ones expect it
-        to be passed in. Support both so the same code runs on Debian's
-        packaged bindings and on a pip-installed version.
+        Requires python-gphoto2 >= 2.3, whose Camera.file_get() takes the
+        destination CameraFile as an argument instead of returning a new one.
         """
-        try:
-            camera_file = gp.CameraFile()
-            self._cap.file_get(folder, name, file_type, camera_file, self._ctxt)
-            return camera_file
-        except TypeError as e:
-            if "expected at most 4 arguments" not in str(e):
-                raise
-            return self._cap.file_get(folder, name, file_type, self._ctxt)
+        camera_file = gp.CameraFile()
+        self._cap.file_get(folder, name, file_type, camera_file, self._ctxt)
+        return camera_file
 
     def setActive(self):
         config = self._cap.get_config(self._ctxt)
