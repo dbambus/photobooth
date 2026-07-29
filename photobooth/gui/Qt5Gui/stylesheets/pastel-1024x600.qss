@@ -140,7 +140,7 @@ QWidget#TransparentOverlay {
 QWidget#PostprocessMessage QLabel {
 	background-color: #ffffff;
     color: #49a300;
-    font-size: 90px;
+    font-size: 44px;
     qproperty-alignment: AlignCenter;
 }
 
@@ -148,7 +148,8 @@ QWidget#PostprocessMessage QPushButton {
     color: #49a300;
     border-color: #49a300;
     background-color: transparent;
-    margin: 20px;
+    font-size: 40px;
+    margin: 8px 60px;
 }
 
 QWidget#PostprocessMessage QPushButton:pressed {

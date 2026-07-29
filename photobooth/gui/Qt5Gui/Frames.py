@@ -452,6 +452,24 @@ class CountdownMessage(QtWidgets.QFrame):
 
 
 class PostprocessMessage(Widgets.TransparentOverlay):
+    """Confirmation bar anchored to the bottom of the screen.
+
+    Assumes a single postprocess task (this project only ever offers
+    printing), asking "<task label>?" with a "Yes" button. The reviewed
+    picture keeps filling the rest of the screen behind it. A depleting
+    bar visualises the timeout: it drains to empty over its duration and,
+    if nobody confirms, dismisses the same way the old timeout did.
+    """
+
+    # Geometry of the bar and its margin to the screen edges.
+    _BAR_HEIGHT = 220
+    _MARGIN = 40
+    # Height of and margin around the countdown bar drawn at the bottom.
+    _PROGRESS_HEIGHT = 12
+    _PROGRESS_MARGIN = 30
+    # Redraw interval of the countdown bar in milliseconds.
+    _TICK_MS = 40
+
     def __init__(
         self, parent, tasks, worker, idle_handle, timeout=None, timeout_handle=None
     ):
@@ -460,32 +478,108 @@ class PostprocessMessage(Widgets.TransparentOverlay):
 
         super().__init__(parent, timeout, timeout_handle)
         self.setObjectName("PostprocessMessage")
+
+        rect = parent.rect()
+        self.setGeometry(
+            rect.left() + self._MARGIN,
+            rect.bottom() - self._MARGIN - self._BAR_HEIGHT,
+            rect.width() - 2 * self._MARGIN,
+            self._BAR_HEIGHT,
+        )
+
+        self._total = timeout / 1000 if timeout else 0
+        self._elapsed = 0
+        self._progress_timer = (
+            self.startTimer(self._TICK_MS) if self._total > 0 else None
+        )
+
         self.initFrame(tasks, idle_handle, worker)
 
+    def timerEvent(self, event):
+        if event.timerId() == self._progress_timer:
+            self._elapsed += self._TICK_MS / 1000
+            self.update()
+        else:
+            # The base class' own dismiss timer.
+            super().timerEvent(event)
+
     def initFrame(self, tasks, idle_handle, worker):
-        def disableAndCall(button, handle):
+        # This screen only ever has one thing to confirm - printing - so a
+        # single yes/no question replaces the former grid of per-task
+        # buttons plus a separate "start over" button.
+        task = tasks[0]
+
+        def confirm():
             button.setEnabled(False)
-            button.update()
-            worker.put(handle)
+            if self._progress_timer is not None:
+                self.killTimer(self._progress_timer)
+                self._progress_timer = None
+            self.killTimer(self._timer)
+            worker.put(task.action)
+            idle_handle()
 
-        def createButton(task):
-            button = QtWidgets.QPushButton(task.label)
-            button.clicked.connect(lambda: disableAndCall(button, task.action))
-            return button
+        # task.label (e.g. "Print"/"Drucken") is already translated; the
+        # question mark reads the same in every language this project ships.
+        question = QtWidgets.QLabel("{}?".format(task.label))
+        question.setObjectName("question")
 
-        buttons = [createButton(task) for task in tasks]
-        buttons.append(QtWidgets.QPushButton(_("Start over")))
-        buttons[-1].clicked.connect(idle_handle)
-
-        button_lay = QtWidgets.QGridLayout()
-        for i, button in enumerate(buttons):
-            pos = divmod(i, 2)
-            button_lay.addWidget(button, *pos)
+        button = QtWidgets.QPushButton(_("Yes"))
+        button.clicked.connect(confirm)
 
         layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(QtWidgets.QLabel(_("Happy?")))
-        layout.addLayout(button_lay)
+        layout.addWidget(question)
+        layout.addWidget(button)
+        layout.setContentsMargins(
+            self._PROGRESS_MARGIN,
+            10,
+            self._PROGRESS_MARGIN,
+            self._PROGRESS_HEIGHT + self._PROGRESS_MARGIN,
+        )
         self.setLayout(layout)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        if self._total <= 0:
+            return
+
+        width = self.width() - 2 * self._PROGRESS_MARGIN
+        if width <= 0:
+            return
+
+        top = self.height() - self._PROGRESS_MARGIN - self._PROGRESS_HEIGHT
+        radius = self._PROGRESS_HEIGHT // 2
+        remaining = max(0, 1 - self._elapsed / self._total)
+
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
+
+        painter.setBrush(QtGui.QColor("#eeeeee"))
+        painter.drawRoundedRect(
+            self._PROGRESS_MARGIN,
+            top,
+            width,
+            self._PROGRESS_HEIGHT,
+            radius,
+            radius,
+        )
+
+        # Anchored to the left, shrinking from the right - the reverse of a
+        # normal loading bar that fills up.
+        done = int(width * remaining)
+        if done > 0:
+            painter.setBrush(QtGui.QColor("#49a300"))
+            painter.drawRoundedRect(
+                self._PROGRESS_MARGIN,
+                top,
+                done,
+                self._PROGRESS_HEIGHT,
+                radius,
+                radius,
+            )
+
+        painter.end()
 
 
 class SetDateTime(QtWidgets.QFrame):

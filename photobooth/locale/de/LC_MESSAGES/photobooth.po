@@ -86,6 +86,10 @@ msgstr "Nochmal"
 msgid "Happy?"
 msgstr "Zufrieden?"
 
+#: photobooth/gui/Qt5Gui/Frames.py:526
+msgid "Yes"
+msgstr "Ja"
+
 #: photobooth/gui/Qt5Gui/Frames.py:409
 msgid "Date:"
 msgstr "Datum:"

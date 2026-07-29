@@ -436,6 +436,13 @@ class PyQt5Gui(GuiSkeleton):
 
     def showPostprocess(self, state):
         tasks = self._postprocess.get(self._picture, state.gif)
+
+        if not tasks:
+            # Nothing to confirm - e.g. the printer is disabled - so there
+            # is nothing to show here.
+            self._comm.send(Workers.MASTER, GuiEvent("idle"))
+            return
+
         postproc_t = self._cfg.getInt("Photobooth", "postprocess_time")
 
         Frames.PostprocessMessage(
