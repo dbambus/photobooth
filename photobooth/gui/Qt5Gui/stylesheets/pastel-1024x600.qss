@@ -131,7 +131,9 @@ QWidget#TransparentOverlay {
     background-color: #ffffff;
     border-style: outset;
     border-width: 1px;
-    border-radius: 0px;
+    border-color: #49a300;
+    /* Keep in sync with PostprocessMessage._BORDER_RADIUS in Frames.py. */
+    border-radius: 24px;
     padding: 0px;
 }
 
@@ -149,7 +151,7 @@ QWidget#PostprocessMessage QPushButton {
     border-color: #49a300;
     background-color: transparent;
     font-size: 40px;
-    margin: 8px 60px;
+    margin: 0px;
 }
 
 QWidget#PostprocessMessage QPushButton:pressed {

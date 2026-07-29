@@ -461,11 +461,21 @@ class PostprocessMessage(Widgets.TransparentOverlay):
     if nobody confirms, dismisses the same way the old timeout did.
     """
 
-    # Geometry of the bar and its margin to the screen edges.
-    _BAR_HEIGHT = 220
-    _MARGIN = 40
-    # Height of and margin around the countdown bar drawn at the bottom.
-    _PROGRESS_HEIGHT = 12
+    # The bar spans this fraction of the screen width, centered, rather
+    # than stretching edge to edge.
+    _WIDTH_FRACTION = 0.55
+    # Height of the bar and its margin to the bottom screen edge.
+    _BAR_HEIGHT = 280
+    _BOTTOM_MARGIN = 40
+    # Rounding applied to the bar's own corners.
+    _BORDER_RADIUS = 24
+    # Padding from the bar's edges to its content (question, button).
+    _CONTENT_MARGIN = 30
+    # Gap between the question and the button, and between the button and
+    # the countdown bar.
+    _SPACING = 20
+    # Height of and side/bottom margin around the countdown bar.
+    _PROGRESS_HEIGHT = 14
     _PROGRESS_MARGIN = 30
     # Redraw interval of the countdown bar in milliseconds.
     _TICK_MS = 40
@@ -480,10 +490,11 @@ class PostprocessMessage(Widgets.TransparentOverlay):
         self.setObjectName("PostprocessMessage")
 
         rect = parent.rect()
+        width = int(rect.width() * self._WIDTH_FRACTION)
         self.setGeometry(
-            rect.left() + self._MARGIN,
-            rect.bottom() - self._MARGIN - self._BAR_HEIGHT,
-            rect.width() - 2 * self._MARGIN,
+            rect.left() + (rect.width() - width) // 2,
+            rect.bottom() - self._BOTTOM_MARGIN - self._BAR_HEIGHT,
+            width,
             self._BAR_HEIGHT,
         )
 
@@ -527,13 +538,16 @@ class PostprocessMessage(Widgets.TransparentOverlay):
         button.clicked.connect(confirm)
 
         layout = QtWidgets.QVBoxLayout()
+        layout.setSpacing(self._SPACING)
         layout.addWidget(question)
         layout.addWidget(button)
         layout.setContentsMargins(
-            self._PROGRESS_MARGIN,
-            10,
-            self._PROGRESS_MARGIN,
-            self._PROGRESS_HEIGHT + self._PROGRESS_MARGIN,
+            self._CONTENT_MARGIN,
+            self._CONTENT_MARGIN,
+            self._CONTENT_MARGIN,
+            # Room for the gap to the button, the countdown bar below it,
+            # and the bar's own margin to the bottom edge.
+            self._SPACING + self._PROGRESS_HEIGHT + self._PROGRESS_MARGIN,
         )
         self.setLayout(layout)
 
