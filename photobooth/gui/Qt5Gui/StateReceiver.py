@@ -22,7 +22,7 @@ from qtpy import QtCore
 from ...Threading import Workers
 
 
-class Receiver(QtCore.QThread):
+class StateReceiver(QtCore.QThread):
     notify = QtCore.Signal(object)
 
     def __init__(self, comm):

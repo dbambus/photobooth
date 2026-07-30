@@ -23,4 +23,4 @@ styles = (
     ("Pastel", "stylesheets/pastel-1024x600.qss"),
 )
 
-from .PyQt5Gui import PyQt5Gui  # noqa
+from .Controller import Controller  # noqa

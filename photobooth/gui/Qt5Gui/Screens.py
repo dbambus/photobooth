@@ -32,7 +32,6 @@ from ... import printer
 
 from . import Widgets
 from . import styles
-from . import PyQt5Gui
 
 
 class Welcome(QtWidgets.QFrame):
