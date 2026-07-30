@@ -167,10 +167,10 @@ QWidget#PostprocessMessage QPushButton:disabled {
 /* Customizing settings */
 
 QTabWidget::pane {
-    background-image: white;
+    background-color: #ffffff;
     color: #49a300;
     padding: 0px;
-    margin: 0; 
+    margin: 0;
 }
 
 QTabWidget::tab-bar {
@@ -202,6 +202,7 @@ QGroupBox {
 }
 
 QTabWidget QWidget {
+    background-color: #ffffff;
     color: #333333;
     font-size: 30px;
 }
