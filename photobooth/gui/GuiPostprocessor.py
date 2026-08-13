@@ -52,7 +52,7 @@ class GuiPostprocessor:
             tasklist = self._get_task_list_gif
         else:
             tasklist = self._get_task_list
-        return [task.get(picture) for task in tasklist]
+        return [task.get(picture) for task in tasklist if task.is_available()]
 
     def do(self, picture, gif=None):
         if gif:
@@ -60,7 +60,8 @@ class GuiPostprocessor:
         else:
             tasklist = self._do_task_list
         for task in tasklist:
-            task.get(picture).action()
+            if task.is_available():
+                task.get(picture).action()
 
 
 class PostprocessTask:
@@ -69,6 +70,10 @@ class PostprocessTask:
 
     def get(self, picture):
         raise NotImplementedError()
+
+    def is_available(self):
+        """Whether this task can currently be offered/run at all."""
+        return True
 
 
 class PostprocessItem:
@@ -109,3 +114,6 @@ class PrintPostprocess(PostprocessTask):
 
     def get(self, picture):
         return PostprocessItem(_("Print"), lambda: self._printer.print(picture))
+
+    def is_available(self):
+        return self._printer.is_connected()

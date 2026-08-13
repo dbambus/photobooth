@@ -42,3 +42,12 @@ class Printer:
 
     def print(self, picture):
         raise NotImplementedError("print function not implemented!")
+
+    def is_connected(self):
+        """Whether the printer is currently able to accept a job.
+
+        Checked freshly right before offering to print, since e.g. a USB
+        printer can be unplugged mid-session. Backends without a concept of
+        a live connection (PDF output, ...) are always available.
+        """
+        return True

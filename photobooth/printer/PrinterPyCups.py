@@ -87,6 +87,7 @@ class PrinterPyCups(Printer):
             self._tmp_filename = "/tmp/print.jpg"
         logging.debug('Storing temp files to "{}"'.format(self._tmp_filename))
 
+        self._printer = None
         self._media_name = None
         if self._conn is not None:
             self._printer = self._conn.getDefault()
@@ -110,6 +111,20 @@ class PrinterPyCups(Printer):
                     )
             finally:
                 os.remove(ppd_filename)
+
+    def is_connected(self):
+        if self._conn is None or self._printer is None:
+            return False
+
+        try:
+            attrs = self._conn.getPrinterAttributes(self._printer)
+        except cups.IPPError as e:
+            logging.warning('Could not query printer state: "{}"'.format(e))
+            return False
+
+        # 5 is IPP_PRINTER_STOPPED - covers a disconnected USB printer as
+        # well as one that is out of paper/ribbon or otherwise erroring.
+        return attrs.get("printer-state") != 5
 
     def print(self, picture):
         options = {"media": self._media_name} if self._media_name else {}
