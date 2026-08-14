@@ -51,6 +51,10 @@ Since then it underwent a complete rewrite, with vastly improved performance and
 * Some computer/SoC that is able to run Python 3.5+ as well as any of the supported camera libraries
 * Camera supported by gPhoto 2 (see [compatibility list](http://gphoto.org/proj/libgphoto2/support.php)), OpenCV (e.g., most standard webcams), or a Raspberry Pi Camera Module.
 * Optional: External buttons and lamps (in combination with gpiozero-compatible hardware)
+* Optional: On systems without GPIO pins, a USB HID keyboard device (e.g. a
+  microcontroller sending Space) works just as well as a trigger button -
+  see [firmware/trigger-button](firmware/trigger-button) for a ready-made
+  CircuitPython example
 
 ### Installing and running the photobooth
 
